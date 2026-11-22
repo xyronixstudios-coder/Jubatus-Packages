@@ -1,0 +1,171 @@
+# ad|açıklama|jps bağımlılıkları (virgülle)|apt paket adı (boşsa ad ile aynı)
+htop|Etkileşimli süreç izleyici
+btop|Modern kaynak izleme aracı
+curl|URL ile veri aktarım aracı
+wget|Dosya indirme aracı
+git|Dağıtık sürüm kontrol sistemi
+vim|Gelişmiş metin düzenleyici
+nano|Basit terminal metin düzenleyici
+tmux|Terminal çoklayıcı
+screen|Terminal oturum yöneticisi
+tree|Dizin ağacı gösterici
+jq|JSON komut satırı işleyici
+ncdu|Disk kullanım analizcisi
+mc|Midnight Commander dosya yöneticisi
+ranger|Konsol dosya yöneticisi
+fzf|Bulanık arama aracı
+ripgrep|Çok hızlı metin arama aracı
+fd-find|Hızlı dosya bulucu
+bat|Sözdizimi renklendiren cat
+lsof|Açık dosyaları listeler
+strace|Sistem çağrısı izleyici
+ltrace|Kütüphane çağrısı izleyici
+iotop|Disk G/Ç izleyici
+iftop|Ağ trafiği izleyici
+nload|Ağ kullanım göstergesi
+zsh|Z kabuğu
+fish|Kullanıcı dostu kabuk
+terminator|Çok bölmeli terminal
+tilix|Döşemeli terminal emülatörü
+kitty|GPU hızlandırmalı terminal
+cowsay|Konuşan inek
+figlet|ASCII yazı sanatı
+cmatrix|Matrix yağmuru
+sl|Buharlı lokomotif
+fortune-mod|Rastgele özlü sözler
+lolcat|Gökkuşağı renkli çıktı
+toilet|Renkli ASCII yazı
+bc|Keyfi duyarlıklı hesap makinesi
+units|Birim dönüştürücü
+gnuplot|Komut satırı grafik çizici
+pandoc|Evrensel belge dönüştürücü
+nmap|Ağ keşif ve port tarayıcı
+traceroute|Paket yolu izleme
+mtr-tiny|Ağ tanılama aracı
+whois|Alan adı sorgulama
+dnsutils|dig ve nslookup araçları
+net-tools|ifconfig ve netstat
+tcpdump|Paket yakalayıcı
+netcat-openbsd|Ağ okuma/yazma aracı
+socat|Çok amaçlı veri aktarıcı
+openssh-server|SSH sunucusu
+openssh-client|SSH istemcisi
+rsync|Hızlı dosya eşitleme
+wireshark|Ağ protokol çözümleyici
+speedtest-cli|İnternet hız testi
+transmission-gtk|BitTorrent istemcisi
+qbittorrent|Gelişmiş BitTorrent istemcisi
+filezilla|FTP/SFTP istemcisi
+remmina|Uzak masaüstü istemcisi
+yt-dlp|Video indirici
+aria2|Çok bağlantılı indirici
+unzip|ZIP açıcı
+zip|ZIP oluşturucu
+p7zip-full|7-Zip arşivleyici
+xz-utils|XZ sıkıştırma
+zstd|Zstandard sıkıştırma
+bzip2|Bzip2 sıkıştırma
+pigz|Paralel gzip
+lz4|Çok hızlı sıkıştırma
+build-essential|Temel derleme araçları
+cmake|Çapraz platform derleme sistemi|build-essential
+make|GNU make
+gcc|GNU C derleyicisi
+g++|GNU C++ derleyicisi
+clang|LLVM C/C++ derleyicisi|build-essential
+gdb|GNU hata ayıklayıcı
+valgrind|Bellek hata ayıklayıcı
+autoconf|Derleme betiği üreticisi
+automake|Makefile üreticisi
+libtool|Genel kütüphane desteği
+pkg-config|Derleme bayrağı yöneticisi
+ninja-build|Hızlı derleme sistemi
+meson|Meson derleme sistemi|python3,ninja-build
+python3|Python 3 yorumlayıcısı
+python3-pip|Python paket yöneticisi|python3
+python3-venv|Python sanal ortamları|python3
+python3-dev|Python geliştirme başlıkları|python3
+nodejs|Node.js çalışma zamanı
+npm|Node.js paket yöneticisi|nodejs
+golang-go|Go programlama dili
+default-jdk|Java geliştirme kiti
+rustc|Rust derleyicisi
+cargo|Rust paket yöneticisi|rustc
+ruby|Ruby yorumlayıcısı
+php-cli|PHP komut satırı
+perl|Perl yorumlayıcısı
+lua5.4|Lua 5.4 yorumlayıcısı
+shellcheck|Kabuk betiği denetleyicisi
+git-lfs|Git büyük dosya desteği|git
+subversion|Subversion sürüm kontrolü
+mercurial|Mercurial sürüm kontrolü
+gh|GitHub komut satırı aracı|git
+doxygen|Kod belgeleme aracı
+graphviz|Graf görselleştirme
+sqlite3|SQLite komut satırı
+neovim|Vim tabanlı editör
+emacs|GNU Emacs editörü
+micro|Sezgisel terminal editörü
+geany|Hafif IDE
+nginx|Web sunucusu
+apache2|Apache HTTP sunucusu
+postgresql|PostgreSQL veritabanı
+mariadb-server|MariaDB sunucusu
+redis-server|Redis anahtar-değer deposu
+docker.io|Docker konteyner motoru
+podman|Rootless konteyner aracı
+ansible|Otomasyon aracı
+vagrant|Sanal geliştirme ortamları
+cron|Zamanlanmış görev servisi
+ffmpeg|Ses ve video dönüştürücü
+vlc|VLC medya oynatıcı
+mpv|Minimal medya oynatıcı
+audacity|Ses düzenleyici
+gimp|GNU görüntü işleme programı
+inkscape|Vektör grafik editörü
+imagemagick|Görüntü işleme araçları
+handbrake|Video dönüştürücü
+obs-studio|Ekran kaydı ve yayın
+kdenlive|Video düzenleyici
+blender|3B modelleme ve animasyon
+krita|Dijital resim programı
+sox|Ses işleme aracı
+lame|MP3 kodlayıcı
+flac|FLAC kodlayıcı
+libreoffice|Ofis paketi
+evince|Belge görüntüleyici
+okular|KDE belge görüntüleyici
+calibre|E-kitap yöneticisi
+texlive-latex-base|LaTeX temel paketi
+keepassxc|Parola yöneticisi
+gparted|Disk bölümleme aracı
+timeshift|Sistem yedekleme
+synaptic|Grafik paket yöneticisi
+baobab|Disk kullanım çözümleyici
+gnome-tweaks|GNOME ince ayarları
+gnome-disk-utility|Disk yardımcı programı
+bleachbit|Sistem temizleyici
+lm-sensors|Donanım sıcaklık sensörleri
+smartmontools|Disk sağlık izleme
+hdparm|Disk parametre aracı
+ufw|Basit güvenlik duvarı
+fail2ban|Saldırı engelleme servisi
+clamav|Antivirüs
+lynis|Güvenlik denetim aracı
+gnupg|GNU gizlilik koruyucusu
+openssl|SSL/TLS araç takımı
+pass|Standart parola yöneticisi
+cpu-checker|CPU sanallaştırma denetimi
+fonts-firacode|Fira Code yazı tipi
+fonts-noto|Noto yazı tipleri
+fonts-liberation|Liberation yazı tipleri
+fonts-roboto|Roboto yazı tipi
+fonts-hack|Hack yazı tipi
+supertuxkart|Yarış oyunu
+0ad|Tarihi strateji oyunu
+gnome-chess|Satranç
+gnome-mines|Mayın tarlası
+frozen-bubble|Balon patlatma oyunu
+gnome-sudoku|Sudoku
+flameshot|Ekran görüntüsü aracı
+redshift|Ekran renk sıcaklığı ayarı
