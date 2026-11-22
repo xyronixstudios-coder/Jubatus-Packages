@@ -1,0 +1,6 @@
+Package: jubatus-sysinfo
+Version: 1.0.0
+Architecture: all
+Maintainer: Jubatus Forge <packages@jubatus.local>
+Depends:
+Description: Sistem, CPU, bellek, disk ve ağ özetini gösterir

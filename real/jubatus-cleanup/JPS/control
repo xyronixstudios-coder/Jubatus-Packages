@@ -1,0 +1,6 @@
+Package: jubatus-cleanup
+Version: 1.0.0
+Architecture: all
+Maintainer: Jubatus Forge <packages@jubatus.local>
+Depends:
+Description: Güvenli sistem temizliği (önce gösterir, --apply ile siler)

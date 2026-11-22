@@ -12,7 +12,7 @@ use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 pub const MAGIC: &[u8; 8] = b"JPSPKG\x01\n";
@@ -205,4 +205,25 @@ impl Control {
             .unwrap_or_default();
         Ok(Control { package, version, architecture, maintainer, description, depends })
     }
+}
+
+/// data bölümünü açar: zstd (28 b5 2f fd) veya eski gzip (1f 8b) paketleri okunur.
+pub fn decompress<'a>(data: &'a [u8]) -> Result<Box<dyn Read + 'a>> {
+    if data.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+        Ok(Box::new(zstd::stream::read::Decoder::new(data)?))
+    } else if data.starts_with(&[0x1f, 0x8b]) {
+        Ok(Box::new(flate2::read::GzDecoder::new(data)))
+    } else {
+        bail!("bilinmeyen sıkıştırma biçimi (data bölümü bozuk)")
+    }
+}
+
+/// Varsayılan zstd seviye 19. JPS_COMPRESSION=gzip eski istemcilerle uyum içindir.
+pub fn compress(raw: &[u8]) -> Result<Vec<u8>> {
+    if std::env::var("JPS_COMPRESSION").map_or(false, |v| v == "gzip") {
+        let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+        e.write_all(raw)?;
+        return Ok(e.finish()?);
+    }
+    Ok(zstd::stream::encode_all(raw, 19)?)
 }

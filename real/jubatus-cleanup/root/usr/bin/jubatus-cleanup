@@ -1,0 +1,37 @@
+#!/bin/sh
+# jubatus-cleanup — yalnızca önbellek ve günlük temizler, kişisel dosyalara dokunmaz
+usage() {
+  echo "Kullanım: jubatus-cleanup [--apply]"
+  echo "  (argümansız)  Neyin temizlenebileceğini gösterir, hiçbir şey silmez."
+  echo "  --apply       Temizler. Sistem alanları için sudo ile çalıştır."
+  echo "Temizlenenler: küçük resim önbelleği, APT/JPS indirme önbelleği, 7 günden eski journal."
+}
+APPLY=0
+case "${1:-}" in
+  --apply) APPLY=1 ;;
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) usage >&2; exit 2 ;;
+esac
+size() { du -sh "$1" 2>/dev/null | cut -f1; }
+row()  { printf '  %-26s %s\n' "$1" "$2"; }
+th="${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails"
+echo "── Temizlenebilir alanlar ──"
+[ -d "$th" ] && row "Küçük resim önbelleği" "$(size "$th")"
+[ -d /var/cache/apt/archives ] && row "APT indirme önbelleği" "$(size /var/cache/apt/archives)"
+[ -d /var/cache/jps ] && row "JPS indirme önbelleği" "$(size /var/cache/jps)"
+command -v journalctl >/dev/null 2>&1 && row "Journal günlükleri" "$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[KMGT]' | head -n1)"
+if [ "$APPLY" -ne 1 ]; then
+  echo; echo "Silmek için: jubatus-cleanup --apply   (sistem alanları: sudo jubatus-cleanup --apply)"
+  exit 0
+fi
+echo; echo "── Temizleniyor ──"
+[ -d "$th" ] && rm -rf "$th" && echo "  ✔ küçük resim önbelleği"
+if [ "$(id -u)" -eq 0 ]; then
+  command -v apt-get >/dev/null 2>&1 && apt-get clean && echo "  ✔ APT önbelleği"
+  [ -d /var/cache/jps ] && rm -rf /var/cache/jps && echo "  ✔ JPS önbelleği"
+  command -v journalctl >/dev/null 2>&1 && journalctl --vacuum-time=7d >/dev/null 2>&1 && echo "  ✔ journal (7 gün)"
+else
+  echo "  (sistem alanları atlandı: sudo jubatus-cleanup --apply)"
+fi
+echo "Bitti."

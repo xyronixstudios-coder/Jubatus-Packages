@@ -1,6 +1,5 @@
 use crate::format::*;
 use anyhow::{bail, Context, Result};
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -69,7 +68,7 @@ fn parse_manifest(text: &str) -> Result<Vec<Entry>> {
 }
 
 fn manifest_from_data(data: &[u8]) -> Result<Vec<Entry>> {
-    let mut ar = tar::Archive::new(GzDecoder::new(data));
+    let mut ar = tar::Archive::new(decompress(data)?);
     let mut out = Vec::new();
     for e in ar.entries()? {
         let mut e = e?;
@@ -108,7 +107,7 @@ fn manifest_from_data(data: &[u8]) -> Result<Vec<Entry>> {
 
 fn unpack(data: &[u8], dest: &Path) -> Result<()> {
     fs::create_dir_all(dest)?;
-    let mut ar = tar::Archive::new(GzDecoder::new(data));
+    let mut ar = tar::Archive::new(decompress(data)?);
     ar.set_preserve_permissions(true);
     for e in ar.entries()? {
         let mut e = e?;
@@ -198,7 +197,7 @@ pub fn build(dir: &Path, out: Option<PathBuf>) -> Result<PathBuf> {
         bail!("{}/root dizini yok", dir.display());
     }
 
-    let mut gz = GzEncoder::new(Vec::new(), Compression::best());
+    let mut gz: Vec<u8> = Vec::new();
     {
         let mut b = tar::Builder::new(&mut gz);
         b.mode(tar::HeaderMode::Deterministic);
@@ -206,7 +205,7 @@ pub fn build(dir: &Path, out: Option<PathBuf>) -> Result<PathBuf> {
         b.append_dir_all(".", &root)?;
         b.finish()?;
     }
-    let data = gz.finish()?;
+    let data = compress(&gz)?;
     let entries = manifest_from_data(&data)?;
 
     let mut sections = vec![

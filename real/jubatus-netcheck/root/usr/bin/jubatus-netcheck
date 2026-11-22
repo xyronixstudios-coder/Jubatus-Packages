@@ -1,0 +1,25 @@
+#!/bin/sh
+# jubatus-netcheck — ağ sorunlarını katman katman bulur
+case "${1:-}" in
+  -h|--help) echo "Kullanım: jubatus-netcheck"; echo "Ağ geçidi → internet(IP) → DNS → HTTPS sırasıyla denetler."; exit 0 ;;
+esac
+FAIL=0
+ok()  { printf '  ✔ %s\n' "$1"; }
+bad() { printf '  ✘ %s\n' "$1"; FAIL=1; }
+echo "── Ağ Denetimi ──"
+gw=$(ip route 2>/dev/null | awk '/^default/ {print $3; exit}')
+if [ -n "$gw" ]; then
+  if ping -c1 -W2 "$gw" >/dev/null 2>&1; then ok "Ağ geçidi erişilebilir ($gw)"; else bad "Ağ geçidi yanıt vermiyor ($gw)"; fi
+else
+  bad "Varsayılan ağ geçidi yok (ağa bağlı değilsin?)"
+fi
+if ping -c1 -W3 1.1.1.1 >/dev/null 2>&1; then ok "İnternet erişimi (IP)"; else bad "İnternet erişimi yok (1.1.1.1)"; fi
+if getent hosts debian.org >/dev/null 2>&1; then ok "DNS çözümleme"; else bad "DNS çözümleme başarısız"; fi
+if command -v curl >/dev/null 2>&1; then
+  if curl -fsS -m 8 -o /dev/null https://github.com 2>/dev/null; then ok "HTTPS erişimi (github.com)"; else bad "HTTPS erişimi başarısız"; fi
+elif command -v wget >/dev/null 2>&1; then
+  if wget -q --spider -T 8 https://github.com 2>/dev/null; then ok "HTTPS erişimi (github.com)"; else bad "HTTPS erişimi başarısız"; fi
+else
+  echo "  - HTTPS testi atlandı (curl/wget yok)"
+fi
+exit $FAIL

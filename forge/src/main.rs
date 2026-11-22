@@ -3,6 +3,7 @@ mod format;
 mod gui;
 mod ops;
 mod repo;
+mod selfupdate;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
@@ -110,6 +111,11 @@ enum Cmd {
         #[command(flatten)]
         c: Common,
     },
+    /// jps kendisini depodaki son sürüme günceller
+    SelfUpdate {
+        #[arg(long)]
+        force: bool,
+    },
     /// Ed25519 imza anahtarı üret
     Keygen,
     /// Paketi imzala
@@ -183,6 +189,7 @@ fn run() -> Result<()> {
         Cmd::Show { name, root } => repo::show(&root, &name),
         Cmd::TrustRepo { c } => repo::trust_repo(&c.opts()),
         Cmd::Clean { c } => repo::clean(&c.opts()),
+        Cmd::SelfUpdate { force } => selfupdate::run(force),
         Cmd::Keygen => extra::keygen(),
         Cmd::Sign { file, key } => extra::sign(&file, key),
         Cmd::Trust { file, system } => extra::trust(&file, system),

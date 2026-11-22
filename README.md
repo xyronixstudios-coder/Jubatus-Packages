@@ -17,3 +17,10 @@
 
 Depo imza anahtarı parmak izi: `79894bcffcff7bfe`
 Kurulumda `jps trust-repo` çıktısındaki değerle karşılaştır.
+
+## Gerçek paketler (`real/`)
+
+`real/<ad>/JPS/control` + `real/<ad>/root/...` düzenindeki klasörler olduğu gibi pakete çevrilir:
+`jubatus-sysinfo`, `jubatus-cleanup`, `jubatus-backup`, `jubatus-netcheck`.
+`jubatus-forge` (jps'in kendisi) amd64 ve i386 olarak otomatik eklenir.
+Paketler zstd ile sıkıştırılır; eski gzip paketler de okunur.

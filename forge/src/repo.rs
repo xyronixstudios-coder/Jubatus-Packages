@@ -14,7 +14,7 @@ use std::process::{Command, Stdio};
 pub const DEFAULT_REPO: &str =
     "https://raw.githubusercontent.com/xyronixstudios-coder/Jubatus-Packages/repo";
 
-fn repo_url(root: &Path) -> String {
+pub fn repo_url(root: &Path) -> String {
     if let Ok(u) = std::env::var("JPS_REPO") {
         if !u.trim().is_empty() {
             return u.trim().trim_end_matches('/').to_string();
@@ -51,7 +51,7 @@ fn have(cmd: &str) -> bool {
         .is_ok()
 }
 
-fn fetch(url: &str, dest: &Path) -> Result<()> {
+pub fn fetch(url: &str, dest: &Path) -> Result<()> {
     let tmp = PathBuf::from(format!("{}.part", dest.display()));
     let st = if have("curl") {
         Command::new("curl")

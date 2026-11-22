@@ -1,0 +1,29 @@
+#!/bin/sh
+# jubatus-backup — dizin yedekleme ve doğrulama
+usage() {
+  echo "Kullanım: jubatus-backup <dizin>            yedek alır (~/Yedekler, JUBATUS_BACKUP_DIR ile değişir)"
+  echo "          jubatus-backup --verify <dosya>   yedeği doğrular (sha256 + arşiv okunabilirliği)"
+}
+case "${1:-}" in
+  -h|--help|"") usage; [ -z "${1:-}" ] && exit 2; exit 0 ;;
+  --verify)
+    f="${2:-}"
+    [ -f "$f" ] || { echo "dosya yok: $f" >&2; exit 1; }
+    [ -f "$f.sha256" ] || { echo "sağlama dosyası yok: $f.sha256" >&2; exit 1; }
+    ( cd "$(dirname "$f")" && sha256sum -c "$(basename "$f").sha256" ) || exit 1
+    tar -tzf "$f" >/dev/null && echo "✔ arşiv okunabilir"
+    exit $?
+    ;;
+esac
+src=$1
+[ -d "$src" ] || { echo "dizin değil: $src" >&2; exit 1; }
+abs=$(cd "$src" && pwd)
+name=$(basename "$abs")
+if [ "$abs" = "/" ] || [ -z "$name" ]; then echo "kök dizin yedeklenemez" >&2; exit 1; fi
+dest=${JUBATUS_BACKUP_DIR:-$HOME/Yedekler}
+mkdir -p "$dest" || exit 1
+out="$dest/$name-$(date +%Y%m%d-%H%M%S).tar.gz"
+tar -czf "$out" -C "$(dirname "$abs")" "$name" || { rm -f "$out"; echo "yedekleme başarısız" >&2; exit 1; }
+( cd "$dest" && sha256sum "$(basename "$out")" > "$(basename "$out").sha256" )
+echo "✔ yedek: $out ($(du -h "$out" | cut -f1))"
+echo "  doğrula: jubatus-backup --verify $out"

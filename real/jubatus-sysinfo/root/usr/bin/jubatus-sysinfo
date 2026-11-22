@@ -1,0 +1,22 @@
+#!/bin/sh
+# jubatus-sysinfo — sistem özeti
+case "${1:-}" in
+  -h|--help) echo "Kullanım: jubatus-sysinfo"; echo "Sistem, CPU, bellek, disk ve ağ özetini gösterir."; exit 0 ;;
+esac
+[ -r /etc/os-release ] && . /etc/os-release
+line() { printf '%-12s %s\n' "$1" "$2"; }
+cpu=$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null | head -n1)
+mem=$(free -h 2>/dev/null | awk '/^Mem:/ {print $3 " / " $2}')
+disk=$(df -h / 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')
+ips=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | head -n3 | tr '\n' ' ')
+echo "── Jubatus Sistem Bilgisi ──"
+line "Sistem"     "${PRETTY_NAME:-$(uname -s)}"
+line "Çekirdek"   "$(uname -r)"
+line "Mimari"     "$(uname -m)"
+line "Makine"     "$(hostname 2>/dev/null)"
+line "Çalışma"    "$(uptime -p 2>/dev/null || echo bilinmiyor)"
+line "CPU"        "${cpu:-bilinmiyor} ($(nproc 2>/dev/null || echo '?') çekirdek)"
+line "Yük"        "$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null)"
+line "Bellek"     "${mem:-bilinmiyor}"
+line "Disk (/)"   "${disk:-bilinmiyor}"
+line "IP"         "${ips:-yok}"
