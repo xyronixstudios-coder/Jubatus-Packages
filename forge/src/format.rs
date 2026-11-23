@@ -225,5 +225,6 @@ pub fn compress(raw: &[u8]) -> Result<Vec<u8>> {
         e.write_all(raw)?;
         return Ok(e.finish()?);
     }
-    Ok(zstd::stream::encode_all(raw, 19)?)
+    let lvl: i32 = std::env::var("JPS_ZSTD_LEVEL").ok().and_then(|v| v.parse().ok()).unwrap_or(19);
+    Ok(zstd::stream::encode_all(raw, lvl)?)
 }

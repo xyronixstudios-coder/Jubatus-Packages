@@ -4,6 +4,7 @@ mod gui;
 mod ops;
 mod repo;
 mod selfupdate;
+mod tools;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
@@ -92,6 +93,9 @@ enum Cmd {
     /// Depoda ara
     Search {
         term: String,
+        /// Kütüphane/bağımlılık paketlerini de göster
+        #[arg(long)]
+        all: bool,
         #[arg(long, default_value = "/")]
         root: PathBuf,
     },
@@ -115,6 +119,31 @@ enum Cmd {
     SelfUpdate {
         #[arg(long)]
         force: bool,
+    },
+    /// Kurulu dosyaların bütünlüğünü denetle (sağlama toplamı)
+    Check {
+        name: Option<String>,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Kurulu paketin dosyalarını listele
+    Files {
+        name: String,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Bir dosyanın hangi pakete ait olduğunu bul
+    Owns {
+        path: String,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Bağımlılık olarak gelip artık gerekmeyen paketleri kaldır
+    Autoremove {
+        #[arg(short, long)]
+        yes: bool,
+        #[command(flatten)]
+        c: Common,
     },
     /// Ed25519 imza anahtarı üret
     Keygen,
@@ -185,10 +214,14 @@ fn run() -> Result<()> {
         Cmd::List { root } => ops::list(&root),
         Cmd::Update { c } => repo::update(&c.opts()),
         Cmd::Upgrade { yes, c } => repo::upgrade(&c.opts(), yes),
-        Cmd::Search { term, root } => repo::search(&root, &term),
+        Cmd::Search { term, root, all } => repo::search(&root, &term, all),
         Cmd::Show { name, root } => repo::show(&root, &name),
         Cmd::TrustRepo { c } => repo::trust_repo(&c.opts()),
         Cmd::Clean { c } => repo::clean(&c.opts()),
+        Cmd::Check { name, root } => tools::check(&root, name.as_deref()),
+        Cmd::Files { name, root } => tools::files(&root, &name),
+        Cmd::Owns { path, root } => tools::owns(&root, &path),
+        Cmd::Autoremove { yes, c } => tools::autoremove(&c.opts(), yes),
         Cmd::SelfUpdate { force } => selfupdate::run(force),
         Cmd::Keygen => extra::keygen(),
         Cmd::Sign { file, key } => extra::sign(&file, key),

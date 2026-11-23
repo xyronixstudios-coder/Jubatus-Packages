@@ -21,7 +21,7 @@ pub struct Entry {
     pub path: String,
 }
 
-fn db_dir(root: &Path) -> PathBuf {
+pub fn db_dir(root: &Path) -> PathBuf {
     root.join("var/lib/jps")
 }
 
@@ -43,7 +43,7 @@ fn manifest_text(entries: &[Entry]) -> String {
     s
 }
 
-fn parse_manifest(text: &str) -> Result<Vec<Entry>> {
+pub fn parse_manifest(text: &str) -> Result<Vec<Entry>> {
     let mut v = Vec::new();
     for line in text.lines() {
         if line.is_empty() {
@@ -105,7 +105,7 @@ fn manifest_from_data(data: &[u8]) -> Result<Vec<Entry>> {
     Ok(out)
 }
 
-fn unpack(data: &[u8], dest: &Path) -> Result<()> {
+fn unpack(data: &[u8], dest: &Path, skip: &HashSet<String>) -> Result<()> {
     fs::create_dir_all(dest)?;
     let mut ar = tar::Archive::new(decompress(data)?);
     ar.set_preserve_permissions(true);
@@ -117,6 +117,9 @@ fn unpack(data: &[u8], dest: &Path) -> Result<()> {
             None => bail!("güvensiz yol: {p}"),
         };
         if rel.as_os_str().is_empty() {
+            continue;
+        }
+        if skip.contains(&*rel.to_string_lossy()) {
             continue;
         }
         // Var olan dizinlerin izinlerine dokunma (/usr, /etc ...)
@@ -275,7 +278,7 @@ pub fn verify(file: &Path) -> Result<()> {
 
 pub fn extract(file: &Path, dest: &Path) -> Result<()> {
     let (pkg, _, _) = load_checked(file)?;
-    unpack(pkg.get("data").context("data yok")?, dest)?;
+    unpack(pkg.get("data").context("data yok")?, dest, &HashSet::new())?;
     println!("✔ çıkarıldı: {}", dest.display());
     Ok(())
 }
@@ -388,6 +391,14 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
         None
     };
     let action = if old.is_some() { "upgrade" } else { "install" };
+    let skip = guard_plan(&o.root, &entries, old.as_deref(), &others, o.force);
+    if !skip.is_empty() {
+        eprintln!("  {} dosya sistemde zaten var (jps'e ait değil) veya ayarı değiştirilmiş: dokunulmadı", skip.len());
+        if skip.len() == entries.iter().filter(|e| e.kind != 'd').count() {
+            eprintln!("  ipucu: paketin tüm dosyaları sistemde mevcut (apt ile kurulu olabilir)");
+        }
+    }
+    let owned: Vec<Entry> = entries.iter().filter(|e| !skip.contains(&e.path)).cloned().collect();
     eprintln!("{} {} ({}) kuruluyor...", c.package, c.version, action);
 
     run_script("preinst", pkg.get("preinst"), &c, action, o)?;
@@ -395,7 +406,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
     // Kayıt önce yazılır: yarım kalan kurulum bile `jps remove` ile temizlenebilir.
     fs::create_dir_all(&pkgdb)?;
     fs::write(pkgdb.join("control"), control_text(&pkg)?)?;
-    fs::write(pkgdb.join("manifest"), manifest_text(&entries))?;
+    fs::write(pkgdb.join("manifest"), manifest_text(&owned))?;
     for s in SCRIPTS {
         match pkg.get(s) {
             Some(d) => fs::write(pkgdb.join(s), d)?,
@@ -405,7 +416,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
         }
     }
 
-    unpack(data, &o.root)?;
+    unpack(data, &o.root, &skip)?;
 
     if let Some(old) = &old {
         let newset: HashSet<&str> = entries.iter().map(|e| e.path.as_str()).collect();
@@ -500,4 +511,50 @@ pub fn list(root: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Kurulumdan önce: jps'e ait olmayan veya kullanıcının değiştirdiği dosyaları bulur.
+/// Bunların üzerine yazılmaz (apt/dpkg dosyaları ve kullanıcı ayarları korunur). --force hepsini ezer.
+fn guard_plan(
+    root: &Path,
+    entries: &[Entry],
+    old: Option<&[Entry]>,
+    others: &HashMap<String, (String, char)>,
+    force: bool,
+) -> HashSet<String> {
+    let mut skip = HashSet::new();
+    if force {
+        return skip;
+    }
+    let oldmap: HashMap<&str, &Entry> = old
+        .map(|o| o.iter().map(|e| (e.path.as_str(), e)).collect())
+        .unwrap_or_default();
+    for e in entries.iter().filter(|e| e.kind != 'd') {
+        let rel = match safe_rel(&e.path) {
+            Some(r) => r,
+            None => continue,
+        };
+        let p = root.join(rel);
+        if fs::symlink_metadata(&p).is_err() {
+            continue;
+        }
+        match oldmap.get(e.path.as_str()) {
+            Some(oe) => {
+                // Yükseltmede kullanıcı /etc altındaki dosyayı değiştirdiyse koru
+                if e.path.starts_with("etc/") && oe.kind == 'f' {
+                    if let Ok(b) = fs::read(&p) {
+                        if sha_hex(&b) != oe.hash {
+                            skip.insert(e.path.clone());
+                        }
+                    }
+                }
+            }
+            None => {
+                if !others.contains_key(&e.path) {
+                    skip.insert(e.path.clone());
+                }
+            }
+        }
+    }
+    skip
 }

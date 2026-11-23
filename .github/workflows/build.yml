@@ -38,6 +38,7 @@ jobs:
   packages:
     needs: jps
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -51,18 +52,38 @@ jobs:
           test -n "$JPS_SIGNING_KEY" || { echo "JPS_SIGNING_KEY secret tanımlı değil"; exit 1; }
           mkdir -p ~/.config/jps
           (umask 077; printf '%s' "$JPS_SIGNING_KEY" > ~/.config/jps/signing.key)
-      - name: Paketleri üret
+      - name: Debian paketlerini içe aktar (amd64, trixie)
+        run: |
+          mkdir -p trees
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/trees:/trees" debian:trixie-slim \
+            bash /src/scripts/import-debs.sh amd64 /src/packages.list /trees/amd64
+      - name: Debian paketlerini içe aktar (i386, bookworm)
+        run: |
+          docker run --rm --platform linux/386 -v "$PWD:/src:ro" -v "$PWD/trees:/trees" debian:bookworm-slim \
+            bash /src/scripts/import-debs.sh i386 /src/packages.list /trees/i386
+      - name: .jps paketlerini üret
         run: |
           chmod +x bin/jps-64 bin/jps-32
-          REQUIRE_SIGN=1 JPS=bin/jps-64 BIN64=bin/jps-64 BIN32=bin/jps-32 scripts/build-all.sh dist
+          REQUIRE_SIGN=1 JPS_ZSTD_LEVEL=15 JPS=bin/jps-64 BIN64=bin/jps-64 BIN32=bin/jps-32 \
+            scripts/build-all.sh dist trees
       - name: Depoyu yayınla (repo dalı)
         run: |
           cp bin/jps-64 bin/jps-32 install.sh dist/
+          for a in amd64 i386; do cp trees/$a/skipped.txt dist/skipped-$a.txt 2>/dev/null || true; done
           (cd dist && sha256sum jps-64 jps-32 > sha256sums)
           cd dist
           git init -q -b repo
           git config user.name "jubatus-bot"
           git config user.email "bot@users.noreply.github.com"
+          git config http.postBuffer 524288000
           git add -A
           git commit -q -m "repo: ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo:repo
+      - name: Sayı denetimi (mimari başına en az 200 paket)
+        run: |
+          cat dist/STATS.txt
+          . dist/STATS.txt
+          if [ "$amd64" -lt 200 ] || [ "$i386" -lt 200 ]; then
+            echo "200'ün altında: repo dalındaki skipped-amd64.txt / skipped-i386.txt dosyalarına bak"
+            exit 1
+          fi

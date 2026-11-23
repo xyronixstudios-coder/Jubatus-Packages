@@ -84,6 +84,7 @@ pub struct RepoEntry {
     pub file: String,
     pub depends: Vec<String>,
     pub desc: String,
+    pub top: bool,
 }
 
 fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
@@ -97,7 +98,7 @@ fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
         if line.trim().is_empty() {
             continue;
         }
-        let f: Vec<&str> = line.splitn(8, '\t').collect();
+        let f: Vec<&str> = line.splitn(9, '\t').collect();
         if f.len() < 8 {
             continue;
         }
@@ -116,6 +117,7 @@ fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
             file: f[5].into(),
             depends: f[6].split(',').filter(|s| !s.is_empty()).map(String::from).collect(),
             desc: f[7].into(),
+            top: f.get(8).map_or(true, |s| *s == "top"),
         });
     }
     Ok(v)
@@ -242,12 +244,12 @@ pub fn clean(o: &Opts) -> Result<()> {
     Ok(())
 }
 
-pub fn search(root: &Path, term: &str) -> Result<()> {
+pub fn search(root: &Path, term: &str, all: bool) -> Result<()> {
     let idx = load_index(root)?;
     let t = term.to_lowercase();
     let mut v: Vec<&RepoEntry> = idx
         .iter()
-        .filter(|e| e.name.contains(&t) || e.desc.to_lowercase().contains(&t))
+        .filter(|e| (all || e.top) && (e.name.contains(&t) || e.desc.to_lowercase().contains(&t)))
         .collect();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     if v.is_empty() {
@@ -284,7 +286,7 @@ pub fn show(root: &Path, name: &str) -> Result<()> {
 // ───────────── plan / kurulum ─────────────
 
 enum Item {
-    Repo(RepoEntry),
+    Repo(RepoEntry, bool),
     File(PathBuf, Control),
 }
 
@@ -294,6 +296,7 @@ struct Planner<'a> {
     planned: Vec<Item>,
     seen: HashSet<String>,
     quiet: bool,
+    keep_auto: bool,
 }
 
 impl<'a> Planner<'a> {
@@ -307,6 +310,9 @@ impl<'a> Planner<'a> {
         if let Some(iv) = &inst {
             let newer = explicit && e.map_or(false, |x| vercmp(iv, &x.version) == Ordering::Less);
             if !newer {
+                if explicit && !self.keep_auto {
+                    let _ = fs::remove_file(db_dir(self.root).join(name).join("auto"));
+                }
                 if explicit && !self.quiet {
                     println!("{name} zaten en yeni sürümde ({iv})");
                 }
@@ -322,7 +328,8 @@ impl<'a> Planner<'a> {
         for d in &e.depends {
             self.add_name(d, false)?;
         }
-        self.planned.push(Item::Repo(e));
+        let auto = !explicit || (self.keep_auto && is_auto(self.root, name));
+        self.planned.push(Item::Repo(e, auto));
         Ok(())
     }
 
@@ -358,6 +365,7 @@ pub fn install(targets: &[String], o: &Opts, yes: bool, trusted_files: bool) -> 
         planned: Vec::new(),
         seen: HashSet::new(),
         quiet: false,
+        keep_auto: false,
     };
     for t in targets {
         if is_file_target(t) {
@@ -381,6 +389,7 @@ pub fn upgrade(o: &Opts, yes: bool) -> Result<()> {
         planned: Vec::new(),
         seen: HashSet::new(),
         quiet: true,
+        keep_auto: true,
     };
     for (name, _) in installed_list(&o.root) {
         if best(&idx, &name).is_some() {
@@ -400,7 +409,7 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
     let mut total = 0u64;
     for it in &plan {
         match it {
-            Item::Repo(e) => {
+            Item::Repo(e, _) => {
                 total += e.size;
                 println!("  {:<28} {:<12} {}", e.name, e.version, e.desc);
             }
@@ -430,7 +439,7 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
 
     for it in plan {
         match it {
-            Item::Repo(e) => {
+            Item::Repo(e, auto) => {
                 let fname = Path::new(&e.file).file_name().context("geçersiz dosya adı")?.to_owned();
                 let dest = cache.join(fname);
                 let cached_ok = dest.is_file()
@@ -450,7 +459,9 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
                     bail!("{}: paket içeriği dizin kaydıyla uyuşmuyor", e.name);
                 }
                 extra::check_install(&dest, true)?;
+                let had = installed_version(&o.root, &e.name).is_some();
                 ops::install(&dest, o)?;
+                mark_auto(&o.root, &e.name, auto, had);
             }
             Item::File(p, _) => {
                 extra::check_install(&p, trusted_files)?;
@@ -459,4 +470,19 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
         }
     }
     Ok(())
+}
+
+fn is_auto(root: &Path, name: &str) -> bool {
+    db_dir(root).join(name).join("auto").is_file()
+}
+
+fn mark_auto(root: &Path, name: &str, auto: bool, had: bool) {
+    let m = db_dir(root).join(name).join("auto");
+    if auto {
+        if !had {
+            let _ = fs::write(&m, b"");
+        }
+    } else {
+        let _ = fs::remove_file(&m);
+    }
 }

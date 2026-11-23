@@ -1,26 +1,24 @@
 # Jubatus-Packages
 
-`jps` için paket deposu. Paketler GitHub Actions ile derlenir, imzalanır ve `repo` dalına yayınlanır.
+`jps` için paket deposu. Her paket gerçek dosya taşıyan, Ed25519 ile imzalı bir `.jps` dosyasıdır.
+Paketler Debian deposundan GitHub Actions ile içe aktarılır (amd64: Debian 13, i386: Debian 12) ve `repo` dalına yayınlanır.
 
     curl -fsSL https://raw.githubusercontent.com/xyronixstudios-coder/Jubatus-Packages/repo/install.sh | sh
 
-    jps search editör
-    sudo jps install htop
-    sudo jps upgrade
+    jps search editör          # kütüphaneler için: jps search --all libssl
+    sudo jps install jq tmux
+    sudo jps autoremove
+    jps check                  # kurulu dosyaların sağlama toplamı denetimi
+    jps owns /usr/bin/jq
 
-- `packages.list`: paket kataloğu (ad|açıklama|bağımlılıklar|apt adı)
-- `scripts/build-all.sh`: paketleri üretir, indeksi yazar (en az 150 paket şartı)
+- `packages.list`: aday listesi (boşlukla ayrılmış adlar)
+- `scripts/import-debs.sh`: Debian konteynerinde kapanışı çıkarır, .deb'leri jps ağacına çevirir
+- `scripts/build-all.sh`: paketleri üretir, imzalar, indeksi yazar
+- `real/`: Jubatus'un kendi paketleri
 - `forge/`: jps kaynak kodu (jps-64 ve jps-32 buradan derlenir)
-- Gerekli secret: `JPS_SIGNING_KEY` (~/.config/jps/signing.key içeriği)
+- Gerekli secret: `JPS_SIGNING_KEY`
+- Elenen aday paketler ve nedenleri: repo dalındaki `skipped-<mimari>.txt`
 
 ## Güven
 
 Depo imza anahtarı parmak izi: `79894bcffcff7bfe`
-Kurulumda `jps trust-repo` çıktısındaki değerle karşılaştır.
-
-## Gerçek paketler (`real/`)
-
-`real/<ad>/JPS/control` + `real/<ad>/root/...` düzenindeki klasörler olduğu gibi pakete çevrilir:
-`jubatus-sysinfo`, `jubatus-cleanup`, `jubatus-backup`, `jubatus-netcheck`.
-`jubatus-forge` (jps'in kendisi) amd64 ve i386 olarak otomatik eklenir.
-Paketler zstd ile sıkıştırılır; eski gzip paketler de okunur.
