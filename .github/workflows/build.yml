@@ -35,8 +35,30 @@ jobs:
         with:
           name: ${{ matrix.out }}
           path: ${{ matrix.out }}
+  trees:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            image: debian:trixie
+          - arch: i386
+            image: debian:bookworm
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Debian paketlerini içe aktar
+        run: bash scripts/import-debs.sh ${{ matrix.arch }} packages.list trees/${{ matrix.arch }}
+      - name: Arşivle
+        run: tar --numeric-owner -czf trees-${{ matrix.arch }}.tgz -C trees ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trees-${{ matrix.arch }}
+          path: trees-${{ matrix.arch }}.tgz
+          compression-level: 0
   packages:
-    needs: jps
+    needs: [jps, trees]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -52,15 +74,10 @@ jobs:
           test -n "$JPS_SIGNING_KEY" || { echo "JPS_SIGNING_KEY secret tanımlı değil"; exit 1; }
           mkdir -p ~/.config/jps
           (umask 077; printf '%s' "$JPS_SIGNING_KEY" > ~/.config/jps/signing.key)
-      - name: Debian paketlerini içe aktar (amd64, trixie)
+      - name: Paket ağaçlarını aç
         run: |
           mkdir -p trees
-          docker run --rm -v "$PWD:/src:ro" -v "$PWD/trees:/trees" debian:trixie-slim \
-            bash /src/scripts/import-debs.sh amd64 /src/packages.list /trees/amd64
-      - name: Debian paketlerini içe aktar (i386, bookworm)
-        run: |
-          docker run --rm --platform linux/386 -v "$PWD:/src:ro" -v "$PWD/trees:/trees" debian:bookworm-slim \
-            bash /src/scripts/import-debs.sh i386 /src/packages.list /trees/i386
+          for a in amd64 i386; do tar -xzf bin/trees-$a.tgz -C trees; done
       - name: .jps paketlerini üret
         run: |
           chmod +x bin/jps-64 bin/jps-32

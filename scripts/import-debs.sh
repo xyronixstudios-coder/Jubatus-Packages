@@ -1,36 +1,60 @@
 #!/bin/bash
-# Debian konteyneri İÇİNDE çalışır. Adayların bağımlılık kapanışını indirir ve jps paket ağaçlarına çevirir.
-# Kullanım: import-debs.sh <mimari> <aday-listesi> <çıktı-dizini>
+# Docker gerektirmez. Debian/Ubuntu tabanlı herhangi bir makinede (root'suz) çalışır.
+# Kullanım: import-debs.sh <amd64|i386> <aday-listesi> <çıktı-dizini>
 set -uo pipefail
-ARCH=$1; CAND=$2; OUT=$3
+ARCH=$1; CAND=$(readlink -f "$2"); OUT=$3
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C
-W=/tmp/imp
-rm -rf "$W"; mkdir -p "$W/debs" "$W/ctl" "$OUT"
+W=${JPS_WORK:-/tmp/jps-imp-$ARCH}
+rm -rf "$W"; mkdir -p "$W"/{state/lists/partial,cache/archives/partial,debs,ctl,cl,sk} "$OUT"
+OUT=$(readlink -f "$OUT")
+: > "$W/status"
+
+OPTS="-o Dir::State=$W/state -o Dir::State::status=$W/status -o Dir::Cache=$W/cache -o Debug::NoLocking=1 -o APT::Architecture=$ARCH -o APT::Architectures=$ARCH -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o Acquire::Languages=none"
+printf '#!/bin/sh\nexec apt-get %s "$@"\n' "$OPTS" > "$W/ap"
+printf '#!/bin/sh\nexec apt-cache %s "$@"\n' "$OPTS" > "$W/ac"
+chmod +x "$W/ap" "$W/ac"
 cd "$W"
-apt-get update -qq >/dev/null 2>&1 || { echo "apt update başarısız"; exit 1; }
-: > skipped.txt; : > closure.txt; : > bad.txt
 
-# 1) aday başına bağımlılık kapanışı (tabanda olmayan YENİ paketler)
+echo "→ paket dizini indiriliyor ($ARCH)"
+./ap update -qq 2>"$W/update.err" || { echo "apt update başarısız:"; tail -n 5 "$W/update.err"; exit 1; }
+
+# taban: sistemde zaten bulunan paketler (paketlenmez)
+./ac dumpavail | awk 'BEGIN{RS="";FS="\n"}{n="";e=0;p="";for(i=1;i<=NF;i++){if($i~/^Package: /)n=substr($i,10);if($i~/^Essential: yes/)e=1;if($i~/^Priority: /)p=substr($i,11)} if(e||p=="required"||p=="important")print n}' > base.txt
+printf '%s\n' libstdc++6 libgcc-s1 gcc-12-base gcc-14-base zlib1g libssl3 libssl3t64 libzstd1 liblzma5 libbz2-1.0 \
+  libacl1 libattr1 libselinux1 libpcre2-8-0 libsystemd0 libcap2 libgmp10 libtinfo6 libncursesw6 libcrypt1 >> base.txt
+sort -u base.txt -o base.txt
+
 sed 's/#.*//' "$CAND" | tr -s ' \t' '\n\n' | sed '/^$/d' | sort -u > cand.txt
-while IFS= read -r p; do
-  if ! sim=$(apt-get install -s --no-install-recommends "$p" 2>/dev/null); then
-    echo "$p: depoda yok veya çözülemedi" >> skipped.txt; continue
-  fi
-  names=$(printf '%s\n' "$sim" | awk '/^Inst / && $3 ~ /^\(/ {print $2}' | tr '\n' ' ')
-  case " $names " in
-    *" $p "*) echo "$p $names" >> closure.txt ;;
-    *) echo "$p: tabanda zaten var veya sanal paket" >> skipped.txt ;;
-  esac
-done < cand.txt
+echo "→ $(wc -l < cand.txt) aday çözümleniyor"
 
-# 2) indir
+export W
+res() {
+  p=$1
+  if ! out=$("$W/ap" install -s --no-install-recommends "$p" 2>/dev/null); then
+    echo "$p: depoda yok veya çözülemedi" > "$W/sk/$p"; return
+  fi
+  names=$(printf '%s\n' "$out" | awk '/^Inst /{print $2}' | sort -u | grep -vxFf "$W/base.txt" | tr '\n' ' ')
+  case " $names " in
+    *" $p "*) echo "$p $names" > "$W/cl/$p" ;;
+    *) echo "$p: tabanda zaten var veya sanal paket" > "$W/sk/$p" ;;
+  esac
+}
+export -f res
+xargs -P 8 -I{} bash -c 'res "$1"' _ {} < cand.txt
+
+cat cl/* 2>/dev/null > closure.txt || true
+cat sk/* 2>/dev/null > skipped.txt || true
+echo "→ çözüldü: $(wc -l < closure.txt) aday"
+[ -s closure.txt ] || { echo "hiç paket çözülemedi"; exit 1; }
+
 cut -d' ' -f2- closure.txt | tr ' ' '\n' | sed '/^$/d' | sort -u > need.txt
-[ -s need.txt ] || { echo "hiç paket çözülemedi"; exit 1; }
+echo "→ $(wc -l < need.txt) .deb indiriliyor"
 chmod 777 debs
-( cd debs && xargs -n 40 apt-get download -qq < ../need.txt ) 2> dl.err \
+( cd debs && xargs -n 50 "$W/ap" download -qq < ../need.txt ) 2> dl.err \
   || { echo "indirme hatası:"; tail -n 20 dl.err; exit 1; }
 
-# 3) kurulum betiği gerektirenleri bul (kullanıcı/grup, debconf, dpkg durumu)
+# kurulum betiği gerektirenleri bul
+: > bad.txt
 declare -A DEB
 for f in debs/*.deb; do
   n=$(dpkg-deb -f "$f" Package)
@@ -42,7 +66,6 @@ for f in debs/*.deb; do
   fi
 done
 
-# 4) elemeler
 awk 'FILENAME=="bad.txt"{bad[$1]=1;next}
 { why=""; for(i=2;i<=NF;i++) if($i in bad) why=$i;
   if(why=="") print $1; else print $1": "why" kurulum betiği gerektiriyor (desteklenmiyor)" > "/dev/stderr" }' \
@@ -50,7 +73,7 @@ awk 'FILENAME=="bad.txt"{bad[$1]=1;next}
 awk 'FILENAME=="top.list"{top[$1]=1;next} ($1 in top){for(i=1;i<=NF;i++) print $i}' top.list closure.txt \
   | sort -u > final.list
 
-mapdeps() {  # $1 ham Depends, $2 paketin kendisi
+mapdeps() {
   local raw=$1 self=$2 out="" part alt n
   local -a parts alts
   IFS=',' read -ra parts <<< "$raw"
@@ -68,19 +91,18 @@ mapdeps() {  # $1 ham Depends, $2 paketin kendisi
   printf '%s' "$out"
 }
 
-# 5) paket ağaçlarını üret
 while IFS= read -r n; do
   f=${DEB[$n]:-}
   [ -n "$f" ] || { echo "$n: .deb bulunamadı" >> skipped.txt; continue; }
   d="$OUT/$n"; rm -rf "$d"; mkdir -p "$d/JPS" "$d/root"
   dpkg-deb -x "$f" "$d/root" || { echo "$n: açılamadı" >> skipped.txt; rm -rf "$d"; continue; }
-  for x in bin sbin lib lib32 lib64 libx32; do   # usr-merge: /bin -> /usr/bin
+  for x in bin sbin lib lib32 lib64 libx32; do
     if [ -d "$d/root/$x" ] && [ ! -L "$d/root/$x" ]; then
       mkdir -p "$d/root/usr/$x"; cp -a "$d/root/$x/." "$d/root/usr/$x/"; rm -rf "$d/root/$x"
     fi
   done
   rm -rf "$d/root/usr/share/locale" "$d/root/usr/share/lintian" "$d/root/usr/share/bug"
-  if [ -d "$d/root/usr/share/doc" ]; then   # yalnızca lisans (copyright) kalır
+  if [ -d "$d/root/usr/share/doc" ]; then
     find "$d/root/usr/share/doc" -type f ! -name copyright -delete
     find "$d/root/usr/share/doc" -type l -delete
   fi
@@ -93,12 +115,9 @@ while IFS= read -r n; do
   raw="$(dpkg-deb -f "$f" Pre-Depends 2>/dev/null | tr '\n' ' '), $(dpkg-deb -f "$f" Depends 2>/dev/null | tr '\n' ' ')"
   deps=$(mapdeps "$raw" "$n")
   {
-    echo "Package: $n"
-    echo "Version: $ver"
-    echo "Architecture: $arch"
+    echo "Package: $n"; echo "Version: $ver"; echo "Architecture: $arch"
     echo "Maintainer: Jubatus Forge <packages@jubatus.local>"
-    echo "Depends: $deps"
-    echo "Description: $desc"
+    echo "Depends: $deps"; echo "Description: $desc"
   } > "$d/JPS/control"
 
   post=""
