@@ -22,6 +22,7 @@ echo "→ paket dizini indiriliyor ($ARCH)"
 ./ac dumpavail | awk 'BEGIN{RS="";FS="\n"}{n="";e=0;p="";for(i=1;i<=NF;i++){if($i~/^Package: /)n=substr($i,10);if($i~/^Essential: yes/)e=1;if($i~/^Priority: /)p=substr($i,11)} if(e||p=="required"||p=="important")print n}' > base.txt
 printf '%s\n' libstdc++6 libgcc-s1 gcc-12-base gcc-14-base zlib1g libssl3 libssl3t64 libzstd1 liblzma5 libbz2-1.0 \
   libacl1 libattr1 libselinux1 libpcre2-8-0 libsystemd0 libcap2 libgmp10 libtinfo6 libncursesw6 libcrypt1 >> base.txt
+printf "%s\n" libc6 libc-bin libgcc-s1 libstdc++6 >> base.txt
 sort -u base.txt -o base.txt
 
 sed 's/#.*//' "$CAND" | tr -s ' \t' '\n\n' | sed '/^$/d' | sort -u > cand.txt
