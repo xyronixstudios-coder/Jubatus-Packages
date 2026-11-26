@@ -1,0 +1,1 @@
+Debian betiği 'iperf3' kullanıcısını oluşturur ve debconf ile servis sorar; jps yalnızca kullanıcıyı oluşturur, servisi açmaz.

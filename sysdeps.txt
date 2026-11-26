@@ -1,0 +1,9 @@
+# Sistemden beklenen paketler: jps bunları paketlemez, pakete "Depends-System:" olarak yazar.
+# Kurulumda dpkg kaydına bakılır; yoksa "sudo apt install ..." önerisiyle durur.
+# Bu paketlerin kendi kurulum betikleri (debconf, kullanıcı, alternatif) jps tarafından çalıştırılamaz.
+dictionaries-common
+fontconfig-config
+x11-common
+uuid-runtime
+openssh-client
+ca-certificates

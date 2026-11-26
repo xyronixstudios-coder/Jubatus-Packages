@@ -153,3 +153,49 @@ pub fn autoremove(o: &Opts, yes: bool) -> Result<()> {
     }
     Ok(())
 }
+
+// ───────────────────────── hold / unhold ─────────────────────────
+
+pub fn hold(root: &Path, names: &[String]) -> Result<()> {
+    if names.is_empty() {
+        let mut any = false;
+        for n in pkg_names(root) {
+            if db_dir(root).join(&n).join("hold").is_file() {
+                println!("{n}");
+                any = true;
+            }
+        }
+        if !any {
+            println!("Tutulan paket yok.");
+        }
+        return Ok(());
+    }
+    for n in names {
+        if !valid_name(n) {
+            bail!("geçersiz paket adı: {n}");
+        }
+        let d = db_dir(root).join(n);
+        if !d.join("control").is_file() {
+            bail!("'{n}' kurulu değil");
+        }
+        fs::write(d.join("hold"), b"")?;
+        println!("✔ {n} mevcut sürümde tutuluyor (jps upgrade dokunmaz)");
+    }
+    Ok(())
+}
+
+pub fn unhold(root: &Path, names: &[String]) -> Result<()> {
+    for n in names {
+        if !valid_name(n) {
+            bail!("geçersiz paket adı: {n}");
+        }
+        let p = db_dir(root).join(n).join("hold");
+        if p.is_file() {
+            fs::remove_file(&p)?;
+            println!("✔ {n} artık tutulmuyor");
+        } else {
+            println!("{n} zaten tutulmuyordu");
+        }
+    }
+    Ok(())
+}

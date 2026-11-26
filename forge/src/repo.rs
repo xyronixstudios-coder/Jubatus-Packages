@@ -1,8 +1,9 @@
-//! Depo desteği: update / search / show / install (ad ile) / upgrade
+//! Depo desteği: çoklu depo, imzalı dizin, update / search / show / install / upgrade, hold
 
 use crate::extra;
 use crate::format::*;
 use crate::ops::{self, Opts};
+use crate::sigfile;
 use anyhow::{bail, Context, Result};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -14,22 +15,71 @@ use std::process::{Command, Stdio};
 pub const DEFAULT_REPO: &str =
     "https://raw.githubusercontent.com/xyronixstudios-coder/Jubatus-Packages/repo";
 
+#[derive(Clone, Debug)]
+pub struct Repo {
+    pub name: String,
+    pub url: String,
+    pub id: String,
+}
+
+fn mk_repo(name: &str, url: &str) -> Repo {
+    let url = url.trim().trim_end_matches('/').to_string();
+    let id = sha_hex(url.as_bytes())[..12].to_string();
+    Repo { name: name.to_string(), url, id }
+}
+
+fn env_repo() -> Option<String> {
+    std::env::var("JPS_REPO")
+        .ok()
+        .map(|u| u.trim().trim_end_matches('/').to_string())
+        .filter(|u| !u.is_empty())
+}
+
+fn first_url(p: &Path) -> Option<String> {
+    let t = fs::read_to_string(p).ok()?;
+    t.lines()
+        .map(|l| l.trim())
+        .find(|l| !l.is_empty() && !l.starts_with('#'))
+        .and_then(|l| l.split_whitespace().next())
+        .map(|u| u.to_string())
+}
+
+/// Varsayılan depo (self-update ve install.sh bunu kullanır)
 pub fn repo_url(root: &Path) -> String {
-    if let Ok(u) = std::env::var("JPS_REPO") {
-        if !u.trim().is_empty() {
-            return u.trim().trim_end_matches('/').to_string();
+    if let Some(u) = env_repo() {
+        return u;
+    }
+    first_url(&root.join("etc/jps/repo.conf"))
+        .map(|u| u.trim_end_matches('/').to_string())
+        .unwrap_or_else(|| DEFAULT_REPO.to_string())
+}
+
+/// Öncelik sırası: varsayılan depo, sonra /etc/jps/repo.d/*.list (ada göre). JPS_REPO tanımlıysa yalnızca o.
+pub fn repos(root: &Path) -> Vec<Repo> {
+    let mut v = vec![mk_repo("default", &repo_url(root))];
+    if env_repo().is_some() {
+        return v;
+    }
+    let dir = root.join("etc/jps/repo.d");
+    let mut files: Vec<PathBuf> = fs::read_dir(&dir)
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().map_or(false, |x| x == "list"))
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    for p in files {
+        let name = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        if let Some(u) = first_url(&p) {
+            let r = mk_repo(&name, &u);
+            if !v.iter().any(|x| x.id == r.id) {
+                v.push(r);
+            }
         }
     }
-    if let Ok(t) = fs::read_to_string(root.join("etc/jps/repo.conf")) {
-        if let Some(l) = t
-            .lines()
-            .map(|l| l.trim())
-            .find(|l| !l.is_empty() && !l.starts_with('#'))
-        {
-            return l.trim_end_matches('/').to_string();
-        }
-    }
-    DEFAULT_REPO.to_string()
+    v
 }
 
 fn state_dir(root: &Path) -> PathBuf {
@@ -73,6 +123,23 @@ pub fn fetch(url: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
+fn fp(k: &[u8; 32]) -> String {
+    sha_hex(k)[..16].to_string()
+}
+
+fn confirm(q: &str, default_yes: bool) -> bool {
+    print!("{q}");
+    let _ = std::io::stdout().flush();
+    let mut a = String::new();
+    let _ = std::io::stdin().read_line(&mut a);
+    let a = a.trim().to_lowercase();
+    if a.is_empty() {
+        default_yes
+    } else {
+        a == "e" || a == "evet" || a == "y" || a == "yes"
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct RepoEntry {
@@ -85,13 +152,10 @@ pub struct RepoEntry {
     pub depends: Vec<String>,
     pub desc: String,
     pub top: bool,
+    pub url: String,
 }
 
-fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
-    let p = state_dir(root).join("index");
-    let t = fs::read_to_string(&p).with_context(|| {
-        format!("paket dizini yok: önce 'sudo jps update' çalıştır ({})", p.display())
-    })?;
+fn parse_index(t: &str, url: &str) -> Vec<RepoEntry> {
     let host = ops::host_arch();
     let mut v = Vec::new();
     for line in t.lines() {
@@ -118,9 +182,37 @@ fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
             depends: f[6].split(',').filter(|s| !s.is_empty()).map(String::from).collect(),
             desc: f[7].into(),
             top: f.get(8).map_or(true, |s| *s == "top"),
+            url: url.to_string(),
         });
     }
-    Ok(v)
+    v
+}
+
+/// Tüm depoların birleşik dizini. Aynı adlı pakette önceliği yüksek (önce gelen) depo kazanır.
+fn load_index(root: &Path) -> Result<Vec<RepoEntry>> {
+    let mut out: Vec<RepoEntry> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut any = false;
+    for r in repos(root) {
+        let p = state_dir(root).join(&r.id).join("index");
+        let t = match fs::read_to_string(&p) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        any = true;
+        let ents = parse_index(&t, &r.url);
+        let names: HashSet<String> = ents.iter().map(|e| e.name.clone()).collect();
+        for e in ents {
+            if !seen.contains(&e.name) {
+                out.push(e);
+            }
+        }
+        seen.extend(names);
+    }
+    if !any {
+        bail!("paket dizini yok: önce 'sudo jps update' çalıştır");
+    }
+    Ok(out)
 }
 
 fn best<'a>(idx: &'a [RepoEntry], name: &str) -> Option<&'a RepoEntry> {
@@ -210,25 +302,107 @@ pub fn vercmp(a: &str, b: &str) -> Ordering {
     Ordering::Equal
 }
 
-// ───────────── komutlar ─────────────
+// ───────────── dizin güncelleme (imzalı) ─────────────
 
-pub fn update(o: &Opts) -> Result<()> {
-    let url = repo_url(&o.root);
-    let dir = state_dir(&o.root);
+fn check_index(data: &[u8], sig: Option<&[u8]>, repo_pub: Option<[u8; 32]>) -> Result<String> {
+    let keys = sigfile::trusted_keys();
+    let rp_trusted = repo_pub.map_or(false, |k| keys.contains(&k));
+    match sig {
+        Some(s) if s.len() == 64 => {
+            if let Some(k) = sigfile::verify_bytes(data, s, &keys) {
+                return Ok(format!("✔ dizin imzası geçerli ({})", fp(&k)));
+            }
+            if let Some(rp) = repo_pub {
+                if sigfile::verify_bytes(data, s, &[rp]).is_some() {
+                    return Ok(format!(
+                        "uyarı: dizin imzası geçerli ama anahtar ({}) güvenilir listede değil",
+                        fp(&rp)
+                    ));
+                }
+            }
+            bail!("dizin imzası GEÇERSİZ (dizin değiştirilmiş olabilir)")
+        }
+        Some(_) => bail!("dizin imzası bozuk"),
+        None => {
+            if rp_trusted {
+                bail!("dizin imzası yok ama bu deponun anahtarı güvenilir: imzasız dizin kabul edilmez (depo sahibi: jps sign-file index)");
+            }
+            Ok("uyarı: dizin imzasız (anahtar güvenilir değil)".to_string())
+        }
+    }
+}
+
+fn update_one(root: &Path, r: &Repo) -> Result<usize> {
+    let dir = state_dir(root).join(&r.id);
     fs::create_dir_all(&dir)
         .with_context(|| format!("{} yazılamadı (sudo gerekir)", dir.display()))?;
-    eprintln!("Depo: {url}");
-    fetch(&format!("{url}/index"), &dir.join("index"))?;
-    if fetch(&format!("{url}/signing.pub"), &dir.join("signing.pub")).is_err() {
-        eprintln!("uyarı: signing.pub indirilemedi");
+    let tmp_idx = dir.join("index.new");
+    let tmp_sig = dir.join("index.sig.new");
+    let tmp_pub = dir.join("signing.pub.new");
+    let _ = fs::remove_file(&tmp_sig);
+    let _ = fs::remove_file(&tmp_pub);
+    let cleanup = || {
+        let _ = fs::remove_file(&tmp_idx);
+        let _ = fs::remove_file(&tmp_sig);
+        let _ = fs::remove_file(&tmp_pub);
+    };
+    if let Err(e) = fetch(&format!("{}/index", r.url), &tmp_idx) {
+        cleanup();
+        return Err(e);
     }
-    let n = load_index(&o.root)?.len();
-    println!("✔ dizin güncellendi: {n} paket ({})", ops::host_arch());
+    let have_sig = fetch(&format!("{}/index.sig", r.url), &tmp_sig).is_ok();
+    let have_pub = fetch(&format!("{}/signing.pub", r.url), &tmp_pub).is_ok();
+    let data = fs::read(&tmp_idx)?;
+    let sig = if have_sig { fs::read(&tmp_sig).ok() } else { None };
+    let rp = if have_pub {
+        fs::read_to_string(&tmp_pub).ok().and_then(|t| sigfile::parse_pub(&t))
+    } else {
+        None
+    };
+    let msg = match check_index(&data, sig.as_deref(), rp) {
+        Ok(m) => m,
+        Err(e) => {
+            cleanup();
+            return Err(e);
+        }
+    };
+    eprintln!("  {msg}");
+    fs::rename(&tmp_idx, dir.join("index"))?;
+    if have_sig {
+        fs::rename(&tmp_sig, dir.join("index.sig"))?;
+    } else {
+        let _ = fs::remove_file(dir.join("index.sig"));
+    }
+    if have_pub {
+        fs::rename(&tmp_pub, dir.join("signing.pub"))?;
+    }
+    let t = String::from_utf8_lossy(&data).into_owned();
+    Ok(parse_index(&t, &r.url).len())
+}
+
+pub fn update(o: &Opts) -> Result<()> {
+    fs::create_dir_all(state_dir(&o.root))
+        .with_context(|| format!("{} yazılamadı (sudo gerekir)", state_dir(&o.root).display()))?;
+    let mut fail = 0usize;
+    for r in repos(&o.root) {
+        eprintln!("Depo [{}]: {}", r.name, r.url);
+        match update_one(&o.root, &r) {
+            Ok(n) => println!("✔ {}: {n} paket ({})", r.name, ops::host_arch()),
+            Err(e) => {
+                fail += 1;
+                eprintln!("✘ {}: {e:#}", r.name);
+            }
+        }
+    }
+    if fail > 0 {
+        bail!("{fail} depo güncellenemedi (başarılı olanlar kaydedildi)");
+    }
     Ok(())
 }
 
 pub fn trust_repo(o: &Opts) -> Result<()> {
-    let p = state_dir(&o.root).join("signing.pub");
+    let r = mk_repo("default", &repo_url(&o.root));
+    let p = state_dir(&o.root).join(&r.id).join("signing.pub");
     if !p.is_file() {
         bail!("önce: sudo jps update");
     }
@@ -243,6 +417,103 @@ pub fn clean(o: &Opts) -> Result<()> {
     println!("✔ indirme önbelleği temizlendi");
     Ok(())
 }
+
+// ───────────── depo yönetimi ─────────────
+
+pub fn repo_add(root: &Path, name: &str, url: &str, yes: bool) -> Result<()> {
+    if !valid_name(name) || name == "default" || name == "env" {
+        bail!("geçersiz depo adı: {name} (küçük harf, rakam, - . +)");
+    }
+    let url = url.trim().trim_end_matches('/');
+    let scheme_ok = url.starts_with("https://") || url.starts_with("http://") || url.starts_with("file://");
+    if !scheme_ok || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        bail!("geçersiz adres (https://... olmalı): {url}");
+    }
+    let list = root.join("etc/jps/repo.d").join(format!("{name}.list"));
+    if list.exists() {
+        bail!("'{name}' zaten tanımlı (önce: jps repo remove {name})");
+    }
+    fs::create_dir_all(state_dir(root))
+        .with_context(|| format!("{} yazılamadı (sudo gerekir)", state_dir(root).display()))?;
+    let tmp = state_dir(root).join(".add.pub");
+    fetch(&format!("{url}/signing.pub"), &tmp).context("depo anahtarı (signing.pub) indirilemedi")?;
+    let text = fs::read_to_string(&tmp).unwrap_or_default();
+    let key = match sigfile::parse_pub(&text) {
+        Some(k) => k,
+        None => {
+            let _ = fs::remove_file(&tmp);
+            bail!("signing.pub geçerli bir Ed25519 anahtarı değil");
+        }
+    };
+    println!("Depo     : {name}");
+    println!("Adres    : {url}");
+    println!("Anahtar  : {}", fp(&key));
+    if url.starts_with("http://") {
+        println!("UYARI    : şifresiz bağlantı (http)");
+    }
+    println!("Bu anahtarı güvenilir yapmak, depo sahibine sistemine kök yetkisiyle çalışan paket kurma izni vermektir.");
+    println!("Parmak izini depo sahibinden başka bir kanaldan doğrula.");
+    if !yes && !confirm("Eklensin mi? [e/H] ", false) {
+        let _ = fs::remove_file(&tmp);
+        println!("İptal edildi.");
+        return Ok(());
+    }
+    extra::trust(&tmp, true)?;
+    let _ = fs::remove_file(&tmp);
+    let dir = root.join("etc/jps/repo.d");
+    fs::create_dir_all(&dir).with_context(|| format!("{} yazılamadı (sudo gerekir)", dir.display()))?;
+    fs::write(&list, format!("{url}\n"))?;
+    println!("✔ depo eklendi. Şimdi: sudo jps update");
+    Ok(())
+}
+
+pub fn repo_list(root: &Path) -> Result<()> {
+    let keys = sigfile::trusted_keys();
+    for (i, r) in repos(root).iter().enumerate() {
+        let st = state_dir(root).join(&r.id);
+        let n = fs::read_to_string(st.join("index")).ok().map(|t| parse_index(&t, &r.url).len());
+        let key = fs::read_to_string(st.join("signing.pub")).ok().and_then(|t| sigfile::parse_pub(&t));
+        let ks = match key {
+            Some(k) => format!("{} ({})", fp(&k), if keys.contains(&k) { "güvenilir" } else { "GÜVENİLİR DEĞİL" }),
+            None => "bilinmiyor".to_string(),
+        };
+        let ns = n.map_or("henüz yok (sudo jps update)".to_string(), |n| n.to_string());
+        println!("{}. {:<12} {}", i + 1, r.name, r.url);
+        println!("   anahtar: {ks}   paket: {ns}");
+    }
+    println!("\nÖncelik yukarıdan aşağıya: aynı adlı pakette ilk depo kazanır.");
+    Ok(())
+}
+
+pub fn repo_remove(root: &Path, name: &str) -> Result<()> {
+    if name == "default" {
+        bail!("varsayılan depo kaldırılamaz");
+    }
+    if !valid_name(name) {
+        bail!("geçersiz depo adı: {name}");
+    }
+    let list = root.join("etc/jps/repo.d").join(format!("{name}.list"));
+    if !list.is_file() {
+        bail!("böyle bir depo yok: {name}");
+    }
+    let r = first_url(&list).map(|u| mk_repo(name, &u));
+    let key = r
+        .as_ref()
+        .and_then(|r| fs::read_to_string(state_dir(root).join(&r.id).join("signing.pub")).ok())
+        .and_then(|t| sigfile::parse_pub(&t));
+    fs::remove_file(&list)?;
+    if let Some(r) = r {
+        let _ = fs::remove_dir_all(state_dir(root).join(&r.id));
+    }
+    println!("✔ depo kaldırıldı: {name}");
+    if let Some(k) = key {
+        println!("Anahtarı hâlâ güvenilir listede: {}", fp(&k));
+        println!("  artık gerekmiyorsa: sudo jps untrust {}", fp(&k));
+    }
+    Ok(())
+}
+
+// ───────────── arama ─────────────
 
 pub fn search(root: &Path, term: &str, all: bool) -> Result<()> {
     let idx = load_index(root)?;
@@ -273,12 +544,16 @@ pub fn show(root: &Path, name: &str) -> Result<()> {
         "Bağımlılık  : {}",
         if e.depends.is_empty() { "-".to_string() } else { e.depends.join(", ") }
     );
+    println!("Depo        : {}", e.url);
     println!("Dosya       : {}", e.file);
     println!("SHA-256     : {}", e.sha);
     println!("Açıklama    : {}", e.desc);
     match installed_version(root, name) {
         Some(v) => println!("Kurulu      : {v}"),
         None => println!("Kurulu      : hayır"),
+    }
+    if is_held(root, name) {
+        println!("Tutuluyor   : evet (jps unhold {name})");
     }
     Ok(())
 }
@@ -308,12 +583,17 @@ impl<'a> Planner<'a> {
         let inst = installed_version(self.root, name);
         let e = best(idx, name);
         if let Some(iv) = &inst {
-            let newer = explicit && e.map_or(false, |x| vercmp(iv, &x.version) == Ordering::Less);
+            let wants = explicit && e.map_or(false, |x| vercmp(iv, &x.version) == Ordering::Less);
+            let held = wants && is_held(self.root, name);
+            if held && !self.quiet {
+                println!("{name} tutuluyor ({iv}); yükseltme atlandı (jps unhold {name})");
+            }
+            let newer = wants && !held;
             if !newer {
                 if explicit && !self.keep_auto {
                     let _ = fs::remove_file(db_dir(self.root).join(name).join("auto"));
                 }
-                if explicit && !self.quiet {
+                if explicit && !self.quiet && !held {
                     println!("{name} zaten en yeni sürümde ({iv})");
                 }
                 self.seen.insert(name.to_string());
@@ -324,7 +604,7 @@ impl<'a> Planner<'a> {
             Some(e) => e.clone(),
             None => bail!("paket bulunamadı: {name} (depo dizini güncel mi? sudo jps update)"),
         };
-        self.seen.insert(name.to_string()); // döngü koruması
+        self.seen.insert(name.to_string());
         for d in &e.depends {
             self.add_name(d, false)?;
         }
@@ -421,21 +701,13 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
     if total > 0 {
         println!("İndirilecek: {} KB", total / 1024 + 1);
     }
-    if !yes {
-        print!("Devam edilsin mi? [E/h] ");
-        std::io::stdout().flush()?;
-        let mut a = String::new();
-        std::io::stdin().read_line(&mut a)?;
-        let a = a.trim().to_lowercase();
-        if !(a.is_empty() || a == "e" || a == "evet" || a == "y") {
-            println!("İptal edildi.");
-            return Ok(());
-        }
+    if !yes && !confirm("Devam edilsin mi? [E/h] ", true) {
+        println!("İptal edildi.");
+        return Ok(());
     }
     let cache = cache_dir(&o.root);
     fs::create_dir_all(&cache)
         .with_context(|| format!("{} yazılamadı (sudo gerekir)", cache.display()))?;
-    let url = repo_url(&o.root);
 
     for it in plan {
         match it {
@@ -446,7 +718,7 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
                     && fs::read(&dest).map(|d| sha_hex(&d) == e.sha).unwrap_or(false);
                 if !cached_ok {
                     eprintln!("↓ {} {}", e.name, e.version);
-                    fetch(&format!("{url}/{}", e.file), &dest)?;
+                    fetch(&format!("{}/{}", e.url, e.file), &dest)?;
                 }
                 let data = fs::read(&dest)?;
                 if sha_hex(&data) != e.sha {
@@ -474,6 +746,10 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
 
 fn is_auto(root: &Path, name: &str) -> bool {
     db_dir(root).join(name).join("auto").is_file()
+}
+
+fn is_held(root: &Path, name: &str) -> bool {
+    valid_name(name) && db_dir(root).join(name).join("hold").is_file()
 }
 
 fn mark_auto(root: &Path, name: &str, auto: bool, had: bool) {

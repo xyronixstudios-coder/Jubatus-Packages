@@ -83,10 +83,30 @@ jobs:
           chmod +x bin/jps-64 bin/jps-32
           REQUIRE_SIGN=1 JPS_ZSTD_LEVEL=15 JPS=bin/jps-64 BIN64=bin/jps-64 BIN32=bin/jps-32 \
             scripts/build-all.sh dist trees
+      - name: İkilileri ve dizini imzala
+        run: |
+          bin/jps-64 sign-file bin/jps-64
+          bin/jps-64 sign-file bin/jps-32
+          bin/jps-64 sign-file dist/index
+      - name: İmzaları openssl ile çapraz doğrula
+        run: |
+          python3 - "$(cat signing.pub)" > pub.pem <<'PY'
+          import base64, sys
+          raw = bytes.fromhex(sys.argv[1].strip())
+          print("-----BEGIN PUBLIC KEY-----")
+          print(base64.b64encode(bytes.fromhex("302a300506032b6570032100") + raw).decode())
+          print("-----END PUBLIC KEY-----")
+          PY
+          for f in bin/jps-64 bin/jps-32 dist/index; do
+            openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in "$f" -sigfile "$f.sig"
+          done
       - name: Depoyu yayınla (repo dalı)
         run: |
-          cp bin/jps-64 bin/jps-32 install.sh dist/
-          for a in amd64 i386; do cp trees/$a/skipped.txt dist/skipped-$a.txt 2>/dev/null || true; done
+          cp bin/jps-64 bin/jps-32 bin/jps-64.sig bin/jps-32.sig install.sh dist/
+          for a in amd64 i386; do
+            cp trees/$a/skipped.txt dist/skipped-$a.txt 2>/dev/null || true
+            cp trees/$a/allowed.txt dist/allowed-$a.txt 2>/dev/null || true
+          done
           (cd dist && sha256sum jps-64 jps-32 > sha256sums)
           cd dist
           git init -q -b repo

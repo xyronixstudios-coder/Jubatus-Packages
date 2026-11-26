@@ -47,6 +47,19 @@ fn inner(exe: &Path, bin: &str, newp: &Path, sums: &Path, force: bool) -> Result
         bail!("{bin}: sağlama toplamı uyuşmuyor, güncelleme iptal edildi");
     }
 
+    let sigp = newp.with_extension("sig");
+    fetch(&format!("{url}/{bin}.sig"), &sigp)
+        .context("imza dosyası indirilemedi (depo imzalı ikili sunmuyor)")?;
+    let sigb = fs::read(&sigp)?;
+    let _ = fs::remove_file(&sigp);
+    let keys = crate::sigfile::trusted_keys();
+    if keys.is_empty() {
+        bail!("güvenilir anahtar yok: önce 'sudo jps trust-repo' (veya jps trust <anahtar>)");
+    }
+    match crate::sigfile::verify_bytes(&fs::read(newp)?, &sigb, &keys) {
+        Some(k) => println!("✔ ikili imzası geçerli ({})", &sha_hex(&k)[..16]),
+        None => bail!("İKİLİ İMZASI GEÇERSİZ: güncelleme iptal edildi"),
+    }
     fs::set_permissions(newp, fs::Permissions::from_mode(0o755))?;
     let out = Command::new(newp)
         .arg("--version")

@@ -147,6 +147,7 @@ pub struct Control {
     pub maintainer: String,
     pub description: String,
     pub depends: Vec<String>,
+    pub sysdepends: Vec<String>,
 }
 
 impl Control {
@@ -203,7 +204,11 @@ impl Control {
                     .collect()
             })
             .unwrap_or_default();
-        Ok(Control { package, version, architecture, maintainer, description, depends })
+        let sysdepends: Vec<String> = m
+            .get("depends-system")
+            .map(|d| d.split(',').map(|x| x.trim().to_string()).filter(|s| valid_name(s)).collect())
+            .unwrap_or_default();
+        Ok(Control { package, version, architecture, maintainer, description, depends, sysdepends })
     }
 }
 

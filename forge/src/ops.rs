@@ -221,6 +221,18 @@ pub fn build(dir: &Path, out: Option<PathBuf>) -> Result<PathBuf> {
             sections.push(Section { name: s.into(), data: fs::read(&p)? });
         }
     }
+    for s in ["sysusers", "services"] {
+        let p = meta.join(s);
+        if p.is_file() {
+            let t = fs::read_to_string(&p).with_context(|| format!("{} okunamadı", p.display()))?;
+            if s == "sysusers" {
+                crate::sys::parse_sysusers(&t)?;
+            } else {
+                crate::sys::parse_services(&t)?;
+            }
+            sections.push(Section { name: s.into(), data: t.into_bytes() });
+        }
+    }
     sections.push(Section { name: "data".into(), data });
 
     let out = out.unwrap_or_else(|| {
@@ -375,6 +387,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
         );
     }
 
+    crate::sys::check_sysdeps(&o.root, &c, o.force)?;
     let others = claimed(&db, &c.package)?;
     for e in entries.iter().filter(|e| e.kind != 'd') {
         if let Some((owner, k)) = others.get(&e.path) {
@@ -402,6 +415,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
     eprintln!("{} {} ({}) kuruluyor...", c.package, c.version, action);
 
     run_script("preinst", pkg.get("preinst"), &c, action, o)?;
+    crate::sys::apply_users(&pkg, o)?;
 
     // Kayıt önce yazılır: yarım kalan kurulum bile `jps remove` ile temizlenebilir.
     fs::create_dir_all(&pkgdb)?;
@@ -416,6 +430,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
         }
     }
 
+    crate::sys::store(&pkg, &pkgdb)?;
     unpack(data, &o.root, &skip)?;
 
     if let Some(old) = &old {
@@ -426,6 +441,7 @@ pub fn install(file: &Path, o: &Opts) -> Result<()> {
     }
 
     run_script("postinst", pkg.get("postinst"), &c, action, o)?;
+    crate::sys::apply_services(&pkg, o)?;
     println!("✔ {} {} kuruldu", c.package, c.version);
     Ok(())
 }
@@ -464,6 +480,7 @@ pub fn remove(name: &str, o: &Opts) -> Result<()> {
     eprintln!("{} {} kaldırılıyor...", c.package, c.version);
     let rd = |n: &str| fs::read(pkgdb.join(n)).ok();
     let (prerm, postrm) = (rd("prerm"), rd("postrm"));
+    crate::sys::stop_services(&pkgdb, o);
     run_script("prerm", prerm.as_deref(), &c, "remove", o)?;
 
     let entries = parse_manifest(&fs::read_to_string(pkgdb.join("manifest"))?)?;
@@ -483,6 +500,7 @@ pub fn remove(name: &str, o: &Opts) -> Result<()> {
     }
 
     run_script("postrm", postrm.as_deref(), &c, "remove", o)?;
+    crate::sys::after_remove(&pkgdb, o);
     fs::remove_dir_all(&pkgdb)?;
     println!("✔ {} kaldırıldı", c.package);
     Ok(())

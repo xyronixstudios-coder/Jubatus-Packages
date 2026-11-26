@@ -22,3 +22,26 @@ Paketler Debian deposundan GitHub Actions ile içe aktarılır (amd64: Debian 13
 ## Güven
 
 Depo imza anahtarı parmak izi: `79894bcffcff7bfe`
+
+## Servis, kullanıcı ve sistem bağımlılığı
+
+- Paketin `JPS/sysusers` dosyası (`g <grup>` / `u <ad> <grup|-> <home|-> <shell|->`) kurulumda sistem kullanıcısı/grubu oluşturur.
+- `JPS/services` dosyası (`birim.service [enable] [start]`) servisi etkinleştirir/başlatır, `jps remove` durdurur.
+- `Depends-System: a, b` alanı, `dpkg`'nin kurduğu paketleri bekler (`sysdeps.txt`).
+- `overrides/<paket>/` klasörü içe aktarılan Debian paketine elle yazılmış betik, kullanıcı, servis ve ek dosya ekler.
+  `allow` dosyası olan paketin Debian bakımcı betikleri çalıştırılmaz, yerine override kullanılır.
+- `scripts/show-scripts.sh <paket>`: override yazmadan önce Debian betiklerini gösterir.
+
+## Çoklu depo ve güvenlik
+
+    sudo jps repo add benim https://ornek.com/jps-repo
+    jps repo list
+    sudo jps repo remove benim
+    sudo jps untrust <parmak-izi>
+
+Aynı adlı pakette önce gelen depo kazanır (varsayılan depo en önce). Depo anahtarını güvenilir yapmak,
+o depo sahibine kök yetkisiyle paket kurma izni vermektir. Depo sahibi paketleri `jps sign`, dizini `jps sign-file index` ile imzalar.
+
+    jps hold htop      # jps upgrade dokunmaz
+    jps unhold htop
+    jps verify-file dosya      # dosya.sig'i güvenilir anahtarlarla doğrular (openssl ile de doğrulanır)

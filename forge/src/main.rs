@@ -5,6 +5,8 @@ mod ops;
 mod repo;
 mod selfupdate;
 mod tools;
+mod sigfile;
+mod sys;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
@@ -34,6 +36,31 @@ impl Common {
     fn opts(self) -> ops::Opts {
         ops::Opts { root: self.root, force: self.force, no_scripts: self.no_scripts }
     }
+}
+
+#[derive(Subcommand)]
+enum RepoCmd {
+    /// Depo ekle ve imza anahtarını güvenilir yap
+    Add {
+        name: String,
+        url: String,
+        /// Onay sorma
+        #[arg(short, long)]
+        yes: bool,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Tanımlı depoları göster
+    List {
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Depoyu kaldır
+    Remove {
+        name: String,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -145,6 +172,39 @@ enum Cmd {
         #[command(flatten)]
         c: Common,
     },
+    /// Depo yönetimi (ekle, listele, kaldır)
+    Repo {
+        #[command(subcommand)]
+        cmd: RepoCmd,
+    },
+    /// Paketi mevcut sürümde tut (upgrade dokunmaz); argümansız: tutulanları listele
+    Hold {
+        names: Vec<String>,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Paket tutmayı kaldır
+    Unhold {
+        #[arg(required = true)]
+        names: Vec<String>,
+        #[arg(long, default_value = "/")]
+        root: PathBuf,
+    },
+    /// Bir dosyayı imzala (yanına .sig yazar; openssl ile de doğrulanabilir)
+    SignFile {
+        file: PathBuf,
+        #[arg(long)]
+        key: Option<PathBuf>,
+    },
+    /// Bir dosyanın .sig imzasını güvenilir anahtarlarla doğrula
+    VerifyFile {
+        file: PathBuf,
+        sig: Option<PathBuf>,
+        #[arg(long)]
+        pubkey: Option<String>,
+    },
+    /// Güvenilir bir anahtarı kaldır (16 haneli parmak izi)
+    Untrust { fingerprint: String },
     /// Ed25519 imza anahtarı üret
     Keygen,
     /// Paketi imzala
@@ -222,6 +282,16 @@ fn run() -> Result<()> {
         Cmd::Files { name, root } => tools::files(&root, &name),
         Cmd::Owns { path, root } => tools::owns(&root, &path),
         Cmd::Autoremove { yes, c } => tools::autoremove(&c.opts(), yes),
+        Cmd::Repo { cmd } => match cmd {
+            RepoCmd::Add { name, url, yes, root } => repo::repo_add(&root, &name, &url, yes),
+            RepoCmd::List { root } => repo::repo_list(&root),
+            RepoCmd::Remove { name, root } => repo::repo_remove(&root, &name),
+        },
+        Cmd::Hold { names, root } => tools::hold(&root, &names),
+        Cmd::Unhold { names, root } => tools::unhold(&root, &names),
+        Cmd::SignFile { file, key } => sigfile::sign_file(&file, key),
+        Cmd::VerifyFile { file, sig, pubkey } => sigfile::verify_file(&file, sig, pubkey),
+        Cmd::Untrust { fingerprint } => sigfile::untrust(&fingerprint),
         Cmd::SelfUpdate { force } => selfupdate::run(force),
         Cmd::Keygen => extra::keygen(),
         Cmd::Sign { file, key } => extra::sign(&file, key),

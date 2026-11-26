@@ -19,11 +19,11 @@ fn home() -> Result<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from).context("HOME tanımlı değil")
 }
 
-fn cfg_dir() -> Result<PathBuf> {
+pub fn cfg_dir() -> Result<PathBuf> {
     Ok(home()?.join(".config/jps"))
 }
 
-fn unhex(s: &str) -> Result<Vec<u8>> {
+pub fn unhex(s: &str) -> Result<Vec<u8>> {
     let s = s.trim();
     if !s.is_ascii() || s.len() % 2 != 0 {
         bail!("geçersiz hex");
@@ -255,7 +255,7 @@ pub fn keygen() -> Result<()> {
     Ok(())
 }
 
-fn load_key(path: Option<PathBuf>) -> Result<SigningKey> {
+pub fn load_key(path: Option<PathBuf>) -> Result<SigningKey> {
     let p = match path {
         Some(p) => p,
         None => cfg_dir()?.join("signing.key"),
@@ -292,7 +292,7 @@ pub enum Sig {
     Valid { fp: String, trusted: bool },
 }
 
-fn trusted_dirs() -> Vec<PathBuf> {
+pub fn trusted_dirs() -> Vec<PathBuf> {
     let mut v = vec![PathBuf::from("/etc/jps/trusted")];
     if let Ok(c) = cfg_dir() {
         v.push(c.join("trusted"));

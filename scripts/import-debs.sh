@@ -1,32 +1,43 @@
 #!/bin/bash
 # Docker gerektirmez. Debian/Ubuntu tabanlı herhangi bir makinede (root'suz) çalışır.
 # Kullanım: import-debs.sh <amd64|i386> <aday-listesi> <çıktı-dizini>
+#   sysdeps.txt      : sistemden beklenen paketler (paketlenmez, Depends-System olarak yazılır)
+#   overrides/<paket>: allow (betik denetimini geç), sysusers, services, preinst/postinst/prerm/postrm, root/ (ek dosyalar)
 set -uo pipefail
 ARCH=$1; CAND=$(readlink -f "$2"); OUT=$3
+SRC=$(dirname "$CAND")
+OVR="$SRC/overrides"
+SYSDEPS="$SRC/sysdeps.txt"
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C
 W=${JPS_WORK:-/tmp/jps-imp-$ARCH}
 rm -rf "$W"; mkdir -p "$W"/{state/lists/partial,cache/archives/partial,debs,ctl,cl,sk} "$OUT"
 OUT=$(readlink -f "$OUT")
+cd "$W"
+
+# sistemden beklenen paketler apt'ye "kurulu" taslak olarak tanıtılır (kendileri ve özel bağımlılıkları indirilmez)
+: > sys.txt
+[ -f "$SYSDEPS" ] && sed 's/#.*//' "$SYSDEPS" | tr -s ' \t' '\n\n' | sed '/^$/d' | sort -u > sys.txt
 : > "$W/status"
+while IFS= read -r p; do
+  printf 'Package: %s\nStatus: install ok installed\nPriority: optional\nSection: misc\nInstalled-Size: 1\nMaintainer: jps <jps@localhost>\nArchitecture: all\nVersion: 99:99\nDescription: host stub\n\n' "$p" >> "$W/status"
+done < sys.txt
 
 OPTS="-o Dir::State=$W/state -o Dir::State::status=$W/status -o Dir::Cache=$W/cache -o Debug::NoLocking=1 -o APT::Architecture=$ARCH -o APT::Architectures=$ARCH -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o Acquire::Languages=none"
 printf '#!/bin/sh\nexec apt-get %s "$@"\n' "$OPTS" > "$W/ap"
 printf '#!/bin/sh\nexec apt-cache %s "$@"\n' "$OPTS" > "$W/ac"
 chmod +x "$W/ap" "$W/ac"
-cd "$W"
 
 echo "→ paket dizini indiriliyor ($ARCH)"
 ./ap update -qq 2>"$W/update.err" || { echo "apt update başarısız:"; tail -n 5 "$W/update.err"; exit 1; }
 
 # taban: sistemde zaten bulunan paketler (paketlenmez)
 ./ac dumpavail | awk 'BEGIN{RS="";FS="\n"}{n="";e=0;p="";for(i=1;i<=NF;i++){if($i~/^Package: /)n=substr($i,10);if($i~/^Essential: yes/)e=1;if($i~/^Priority: /)p=substr($i,11)} if(e||p=="required"||p=="important")print n}' > base.txt
-printf '%s\n' libstdc++6 libgcc-s1 gcc-12-base gcc-14-base zlib1g libssl3 libssl3t64 libzstd1 liblzma5 libbz2-1.0 \
+printf '%s\n' libc6 libc-bin libgcc-s1 libstdc++6 gcc-12-base gcc-14-base zlib1g libssl3 libssl3t64 libzstd1 liblzma5 libbz2-1.0 \
   libacl1 libattr1 libselinux1 libpcre2-8-0 libsystemd0 libcap2 libgmp10 libtinfo6 libncursesw6 libcrypt1 >> base.txt
-printf "%s\n" libc6 libc-bin libgcc-s1 libstdc++6 >> base.txt
 sort -u base.txt -o base.txt
 
 sed 's/#.*//' "$CAND" | tr -s ' \t' '\n\n' | sed '/^$/d' | sort -u > cand.txt
-echo "→ $(wc -l < cand.txt) aday çözümleniyor"
+echo "→ $(wc -l < cand.txt) aday çözümleniyor (sistemden beklenen: $(wc -l < sys.txt))"
 
 export W
 res() {
@@ -54,8 +65,8 @@ chmod 777 debs
 ( cd debs && xargs -n 50 "$W/ap" download -qq < ../need.txt ) 2> dl.err \
   || { echo "indirme hatası:"; tail -n 20 dl.err; exit 1; }
 
-# kurulum betiği gerektirenleri bul
-: > bad.txt
+# kurulum betiği gerektirenleri bul (override/allow olanlar hariç)
+: > bad.txt; : > allowed.txt
 declare -A DEB
 for f in debs/*.deb; do
   n=$(dpkg-deb -f "$f" Package)
@@ -63,7 +74,11 @@ for f in debs/*.deb; do
   rm -rf ctl/x; mkdir -p ctl/x; dpkg-deb -e "$f" ctl/x 2>/dev/null
   if cat ctl/x/preinst ctl/x/postinst ctl/x/prerm ctl/x/postrm 2>/dev/null \
      | grep -Eq 'adduser|addgroup|useradd|groupadd|confmodule|db_get|dpkg-statoverride|dpkg-divert|update-ca-certificates|setcap'; then
-    echo "$n" >> bad.txt
+    if [ -f "$OVR/$n/allow" ]; then
+      echo "$n: bakımcı betikleri atlandı, overrides/$n kullanılıyor" >> allowed.txt
+    else
+      echo "$n" >> bad.txt
+    fi
   fi
 done
 
@@ -74,9 +89,11 @@ awk 'FILENAME=="bad.txt"{bad[$1]=1;next}
 awk 'FILENAME=="top.list"{top[$1]=1;next} ($1 in top){for(i=1;i<=NF;i++) print $i}' top.list closure.txt \
   | sort -u > final.list
 
-mapdeps() {
-  local raw=$1 self=$2 out="" part alt n
+DEPS=""; SYSD=""
+mapdeps() {  # $1 ham Depends, $2 paketin kendisi -> DEPS (jps paketleri), SYSD (sistemden beklenenler)
+  local raw=$1 self=$2 part alt n
   local -a parts alts
+  DEPS=""; SYSD=""
   IFS=',' read -ra parts <<< "$raw"
   for part in "${parts[@]}"; do
     IFS='|' read -ra alts <<< "$part"
@@ -84,12 +101,14 @@ mapdeps() {
       n=$(printf '%s' "$alt" | sed -e 's/([^)]*)//g' -e 's/\[[^]]*\]//g' -e 's/<[^>]*>//g' -e 's/:[a-z0-9-]*//' -e 's/[[:space:]]//g')
       [ -n "$n" ] && [ "$n" != "$self" ] || continue
       if grep -qxF -- "$n" "$W/final.list"; then
-        case ",$out," in *",$n,"*) ;; *) out="$out${out:+,}$n" ;; esac
+        case ",$DEPS," in *",$n,"*) ;; *) DEPS="$DEPS${DEPS:+,}$n" ;; esac
+        break
+      elif grep -qxF -- "$n" "$W/sys.txt"; then
+        case ",$SYSD," in *",$n,"*) ;; *) SYSD="$SYSD${SYSD:+,}$n" ;; esac
         break
       fi
     done
   done
-  printf '%s' "$out"
 }
 
 while IFS= read -r n; do
@@ -114,16 +133,18 @@ while IFS= read -r n; do
   desc=$(dpkg-deb -f "$f" Description | head -n1 | tr -d '\r' | sed 's/[[:space:]]*$//')
   [ -n "$desc" ] || desc="Debian paketi $n"
   raw="$(dpkg-deb -f "$f" Pre-Depends 2>/dev/null | tr '\n' ' '), $(dpkg-deb -f "$f" Depends 2>/dev/null | tr '\n' ' ')"
-  deps=$(mapdeps "$raw" "$n")
+  mapdeps "$raw" "$n"
   {
     echo "Package: $n"; echo "Version: $ver"; echo "Architecture: $arch"
     echo "Maintainer: Jubatus Forge <packages@jubatus.local>"
-    echo "Depends: $deps"; echo "Description: $desc"
+    echo "Depends: $DEPS"
+    [ -n "$SYSD" ] && echo "Depends-System: $SYSD"
+    echo "Description: $desc"
   } > "$d/JPS/control"
 
   post=""
   if find "$d/root" \( -name '*.so' -o -name '*.so.*' \) 2>/dev/null | head -n1 | grep -q .; then
-    post="${post}command -v ldconfig >/dev/null 2>&1 && ldconfig || true\n"
+    post="${post}command -v ldconfig >/dev/null 2>&1 && ldconfig >/dev/null 2>&1 || true\n"
   fi
   if [ -d "$d/root/usr/share/fonts" ]; then
     post="${post}command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null 2>&1 || true\n"
@@ -133,8 +154,19 @@ while IFS= read -r n; do
     cp "$d/JPS/postinst" "$d/JPS/postrm"
     chmod 755 "$d/JPS/postinst" "$d/JPS/postrm"
   fi
+
+  # elle yazılmış override'lar (kullanıcı/servis/betik/ek dosya) varsa onlar kazanır
+  if [ -d "$OVR/$n" ]; then
+    for x in sysusers services preinst postinst prerm postrm; do
+      [ -f "$OVR/$n/$x" ] && cp "$OVR/$n/$x" "$d/JPS/$x"
+    done
+    for x in preinst postinst prerm postrm; do
+      [ -f "$d/JPS/$x" ] && chmod 755 "$d/JPS/$x"
+    done
+    [ -d "$OVR/$n/root" ] && cp -a "$OVR/$n/root/." "$d/root/"
+  fi
 done < final.list
 
-cp top.list final.list skipped.txt "$OUT/"
+cp top.list final.list skipped.txt allowed.txt "$OUT/"
 chmod -R a+rX "$OUT"
-echo "✔ $ARCH: $(wc -l < top.list) aday, $(wc -l < final.list) toplam paket (kütüphaneler dahil), $(wc -l < skipped.txt) atlanan"
+echo "✔ $ARCH: $(wc -l < top.list) aday, $(wc -l < final.list) toplam paket (kütüphaneler dahil), $(wc -l < skipped.txt) atlanan, $(wc -l < allowed.txt) override"
