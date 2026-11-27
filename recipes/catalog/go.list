@@ -1,0 +1,24 @@
+# ad|go modül yolu|açıklama
+fzf|github.com/junegunn/fzf|Bulanık arama
+lazygit|github.com/jesseduffield/lazygit|Git terminal arayüzü
+lazydocker|github.com/jesseduffield/lazydocker|Docker terminal arayüzü
+yq|github.com/mikefarah/yq/v4|YAML/JSON/XML işleyici
+glow|github.com/charmbracelet/glow|Markdown görüntüleyici
+gum|github.com/charmbracelet/gum|Kabuk betikleri için şık arayüz parçaları
+micro|github.com/zyedidia/micro/v2/cmd/micro|Sezgisel terminal editörü
+duf|github.com/muesli/duf|Güzel df alternatifi
+dive|github.com/wagoodman/dive|Docker imaj katman incelemesi
+gdu|github.com/dundee/gdu/v5/cmd/gdu|Hızlı disk kullanımı analizcisi
+croc|github.com/schollz/croc/v10|Güvenli dosya aktarımı
+direnv|github.com/direnv/direnv/v2|Dizine göre ortam değişkenleri
+age|filippo.io/age/cmd/age|Basit, modern dosya şifreleme
+shfmt|mvdan.cc/sh/v3/cmd/shfmt|Kabuk betiği biçimlendirici
+task|github.com/go-task/task/v3/cmd/task|Görev çalıştırıcı (Makefile alternatifi)
+gojq|github.com/itchyny/gojq/cmd/gojq|Go ile yazılmış jq
+chezmoi|github.com/twpayne/chezmoi/v2|Dotfile yöneticisi
+fx|github.com/antonmedv/fx|Etkileşimli JSON görüntüleyici
+ctop|github.com/bcicen/ctop|Konteynerler için top
+lf|github.com/gokcehan/lf|Terminal dosya yöneticisi
+dasel|github.com/tomwright/dasel/v2/cmd/dasel|JSON/YAML/TOML/XML sorgulama
+mkcert|filippo.io/mkcert|Yerel güvenilir sertifika üretici
+restic|github.com/restic/restic/cmd/restic|Şifreli, yinelenmeyen yedekleme

@@ -10,7 +10,6 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 pub const DEFAULT_REPO: &str =
     "https://raw.githubusercontent.com/xyronixstudios-coder/Jubatus-Packages/repo";
@@ -92,27 +91,84 @@ fn db_dir(root: &Path) -> PathBuf {
     root.join("var/lib/jps")
 }
 
-fn have(cmd: &str) -> bool {
-    Command::new(cmd)
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok()
-}
-
+#[cfg(feature = "net")]
 pub fn fetch(url: &str, dest: &Path) -> Result<()> {
     let tmp = PathBuf::from(format!("{}.part", dest.display()));
-    let st = if have("curl") {
-        Command::new("curl")
+    if let Err(e) = fetch_to(url, &tmp) {
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
+    }
+    fs::rename(&tmp, dest)?;
+    Ok(())
+}
+
+#[cfg(feature = "net")]
+fn fetch_to(url: &str, tmp: &Path) -> Result<()> {
+    if let Some(p) = url.strip_prefix("file://") {
+        fs::copy(p, tmp).with_context(|| format!("okunamadı: {p}"))?;
+        return Ok(());
+    }
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        bail!("desteklenmeyen adres: {url}");
+    }
+    let mut ab = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(20))
+        .timeout_read(std::time::Duration::from_secs(60))
+        .redirects(8)
+        .user_agent(concat!("jps/", env!("CARGO_PKG_VERSION")));
+    for k in ["JPS_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"] {
+        if let Ok(p) = std::env::var(k) {
+            if !p.is_empty() {
+                if let Ok(px) = ureq::Proxy::new(&p) {
+                    ab = ab.proxy(px);
+                }
+                break;
+            }
+        }
+    }
+    let agent = ab.build();
+    let mut last = String::new();
+    for attempt in 0..3u64 {
+        match agent.get(url).call() {
+            Ok(resp) => {
+                let mut rd = resp.into_reader();
+                let mut f = fs::File::create(tmp)?;
+                std::io::copy(&mut rd, &mut f)?;
+                return Ok(());
+            }
+            Err(ureq::Error::Status(code, _)) if (400..500).contains(&code) => {
+                bail!("indirilemedi: {url} (HTTP {code})")
+            }
+            Err(e) => {
+                last = e.to_string();
+                std::thread::sleep(std::time::Duration::from_secs(1 + attempt));
+            }
+        }
+    }
+    bail!("indirilemedi: {url}: {last}")
+}
+
+#[cfg(not(feature = "net"))]
+pub fn fetch(url: &str, dest: &Path) -> Result<()> {
+    let tmp = PathBuf::from(format!("{}.part", dest.display()));
+    let has = |c: &str| {
+        std::process::Command::new(c)
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok()
+    };
+    let st = if has("curl") {
+        std::process::Command::new("curl")
             .args(["-fsSL", "--retry", "3", "--connect-timeout", "20", "-o"])
             .arg(&tmp)
             .arg(url)
             .status()
-    } else if have("wget") {
-        Command::new("wget").args(["-q", "-O"]).arg(&tmp).arg(url).status()
+    } else if has("wget") {
+        std::process::Command::new("wget").args(["-q", "-O"]).arg(&tmp).arg(url).status()
     } else {
-        bail!("curl veya wget gerekli (sudo apt install curl)");
+        bail!("curl veya wget gerekli (bu derleme yerleşik indiriciyi içermiyor)");
     };
     let st = st.context("indirme komutu başlatılamadı")?;
     if !st.success() {

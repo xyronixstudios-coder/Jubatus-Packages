@@ -11,7 +11,11 @@ case "$(uname -m)" in
   x86_64|amd64|i?86|x86) ;;
   *) echo "Desteklenmeyen mimari: $(uname -m) (yalnızca jps-64 ve jps-32 var)" >&2; exit 1 ;;
 esac
-if [ "$(getconf LONG_BIT 2>/dev/null || echo 64)" = "32" ]; then BIN=jps-32; else BIN=jps-64; fi
+BITS=$(getconf LONG_BIT 2>/dev/null || true)
+if [ -z "$BITS" ]; then
+  case "$(uname -m)" in i?86|x86) BITS=32 ;; *) BITS=64 ;; esac
+fi
+if [ "$BITS" = "32" ]; then BIN=jps-32; else BIN=jps-64; fi
 echo "Mimari algılandı → $BIN"
 
 get() {
@@ -44,7 +48,11 @@ fi
 
 printf '%s' "$PUBHEX" > "$T/signing.pub"
 SUDO=""
-[ "$(id -u)" -eq 0 ] || SUDO="sudo"
+if [ "$(id -u)" -ne 0 ]; then
+  if command -v sudo >/dev/null 2>&1; then SUDO="sudo"
+  elif command -v doas >/dev/null 2>&1; then SUDO="doas"
+  else echo "HATA: root değilsin ve sudo/doas yok" >&2; exit 1; fi
+fi
 $SUDO install -m755 "$T/$BIN" /usr/local/bin/jps
 $SUDO /usr/local/bin/jps trust "$T/signing.pub" --system
 $SUDO env JPS_REPO="$REPO" /usr/local/bin/jps update

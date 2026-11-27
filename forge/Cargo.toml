@@ -1,6 +1,6 @@
 [package]
 name = "jubatus-forge"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "Jubatus Forge - .jps paket formatı ve yöneticisi"
 license = "MIT"
@@ -10,6 +10,7 @@ name = "jps"
 path = "src/main.rs"
 
 [dependencies]
+ureq = { version = "2", default-features = false, features = ["tls"], optional = true }
 zstd = "0.13"
 ed25519-dalek = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -25,3 +26,7 @@ lto = true
 codegen-units = 1
 strip = true
 panic = "abort"
+
+[features]
+default = ["net"]
+net = ["dep:ureq"]

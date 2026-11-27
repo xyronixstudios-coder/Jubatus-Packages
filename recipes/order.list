@@ -1,0 +1,11 @@
+# Derleme sırası (bağımlılıklar önce)
+zlib
+ncurses
+xz
+bzip2
+libevent
+tmux
+htop
+nano
+jq
+busybox

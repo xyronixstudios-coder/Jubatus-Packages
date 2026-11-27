@@ -28,28 +28,37 @@ jobs:
           tool: cross
       - name: Derle (cross, statik musl)
         working-directory: forge
-        run: cross build --release --locked --target ${{ matrix.target }}
+        run: |
+          cross build --release --locked --target ${{ matrix.target }} || {
+            echo "::warning::yerleşik indirici derlenemedi; curl/wget'e bağımlı sürüm derleniyor"
+            cross build --release --locked --no-default-features --target ${{ matrix.target }}
+          }
       - name: Çıktıyı hazırla
         run: cp forge/target/${{ matrix.target }}/release/jps ${{ matrix.out }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.out }}
           path: ${{ matrix.out }}
-  trees:
+  forge:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 240
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
-            image: debian:trixie
+            platform: linux/amd64
           - arch: i386
-            image: debian:bookworm
-    container: ${{ matrix.image }}
+            platform: linux/386
     steps:
       - uses: actions/checkout@v4
-      - name: Debian paketlerini içe aktar
-        run: bash scripts/import-debs.sh ${{ matrix.arch }} packages.list trees/${{ matrix.arch }}
+      - name: Alpine içinde derle (statik musl)
+        run: |
+          mkdir -p trees
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e HOST_UID="$(id -u)" \
+            alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}
       - name: Arşivle
         run: tar --numeric-owner -czf trees-${{ matrix.arch }}.tgz -C trees ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
@@ -58,7 +67,7 @@ jobs:
           path: trees-${{ matrix.arch }}.tgz
           compression-level: 0
   packages:
-    needs: [jps, trees]
+    needs: [jps, forge]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -105,7 +114,6 @@ jobs:
           cp bin/jps-64 bin/jps-32 bin/jps-64.sig bin/jps-32.sig install.sh dist/
           for a in amd64 i386; do
             cp trees/$a/skipped.txt dist/skipped-$a.txt 2>/dev/null || true
-            cp trees/$a/allowed.txt dist/allowed-$a.txt 2>/dev/null || true
           done
           (cd dist && sha256sum jps-64 jps-32 > sha256sums)
           cd dist
@@ -116,11 +124,11 @@ jobs:
           git add -A
           git commit -q -m "repo: ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo:repo
-      - name: Sayı denetimi (mimari başına en az 200 paket)
+      - name: Sayı denetimi
         run: |
           cat dist/STATS.txt
           . dist/STATS.txt
-          if [ "$amd64" -lt 200 ] || [ "$i386" -lt 200 ]; then
-            echo "200'ün altında: repo dalındaki skipped-amd64.txt / skipped-i386.txt dosyalarına bak"
+          if [ "$amd64" -lt 30 ] || [ "$i386" -lt 15 ]; then
+            echo "Çok az paket (amd64>=30, i386>=15 bekleniyor): repo dalındaki skipped-amd64.txt / skipped-i386.txt dosyalarına bak"
             exit 1
           fi

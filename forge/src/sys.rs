@@ -120,6 +120,11 @@ fn getent(db: &str, name: &str) -> bool {
 }
 
 fn run_ok(cmd: &str, args: &[&str]) -> Result<()> {
+    if !have_cmd(cmd) {
+        if let Some(r) = busybox_fallback(cmd, args) {
+            return r;
+        }
+    }
     let st = Command::new(cmd)
         .args(args)
         .status()
@@ -304,4 +309,43 @@ pub fn store(pkg: &Package, pkgdb: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// ───────────── shadow-utils yoksa BusyBox (Alpine vb.) ─────────────
+
+fn have_cmd(c: &str) -> bool {
+    std::env::var_os("PATH").map_or(false, |p| std::env::split_paths(&p).any(|d| d.join(c).is_file()))
+}
+
+fn run_plain(cmd: &str, args: &[&str]) -> Result<()> {
+    let st = Command::new(cmd)
+        .args(args)
+        .status()
+        .with_context(|| format!("{cmd} başlatılamadı"))?;
+    if !st.success() {
+        bail!("{cmd} başarısız oldu: {}", args.join(" "));
+    }
+    Ok(())
+}
+
+fn busybox_fallback(cmd: &str, args: &[&str]) -> Option<Result<()>> {
+    match cmd {
+        "groupadd" => {
+            if !have_cmd("addgroup") {
+                return None;
+            }
+            let name = *args.last()?;
+            Some(run_plain("addgroup", &["-S", name]))
+        }
+        "useradd" => {
+            if !have_cmd("adduser") {
+                return None;
+            }
+            let name = *args.last()?;
+            let get = |flag: &str| args.iter().position(|a| *a == flag).and_then(|i| args.get(i + 1)).copied();
+            let (g, h, s) = (get("--gid")?, get("--home-dir")?, get("--shell")?);
+            Some(run_plain("adduser", &["-S", "-D", "-H", "-G", g, "-h", h, "-s", s, name]))
+        }
+        _ => None,
+    }
 }

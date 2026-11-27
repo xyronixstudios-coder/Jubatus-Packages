@@ -1,0 +1,35 @@
+# ad|crates.io paketi|açıklama
+ripgrep|ripgrep|Çok hızlı metin arama (rg)
+fd|fd-find|Hızlı ve kolay dosya bulucu (fd)
+bat|bat|Sözdizimi renklendiren, git destekli cat
+zoxide|zoxide|Akıllı cd: sık gidilen dizinleri öğrenir
+hyperfine|hyperfine|Komut satırı kıyaslama aracı
+tokei|tokei|Kod satırı istatistiği
+dust|du-dust|Görsel disk kullanımı (dust)
+sd|sd|Sezgisel bul-değiştir (sed alternatifi)
+hexyl|hexyl|Renkli hex görüntüleyici
+procs|procs|Modern ps alternatifi
+bottom|bottom|Grafiksel sistem izleyici (btm)
+lsd|lsd|Renkli ve ikonlu ls
+eza|eza|Modern ls alternatifi
+tealdeer|tealdeer|Hızlı tldr istemcisi
+just|just|Proje komut çalıştırıcı
+xh|xh|Kullanıcı dostu HTTP istemcisi
+gping|gping|Grafikli ping
+dua|dua-cli|Etkileşimli disk kullanımı (dua)
+watchexec|watchexec-cli|Dosya değişince komut çalıştırır
+git-delta|git-delta|Git diff görüntüleyici (delta)
+ouch|ouch|Arşiv aç/sıkıştır (tek komut)
+grex|grex|Örneklerden düzenli ifade üretir
+choose|choose|cut/awk için insan dostu alternatif
+mdcat|mdcat|Markdown'ı terminalde gösterir
+fnm|fnm|Hızlı Node.js sürüm yöneticisi
+pastel|pastel|Renk aracı
+viu|viu|Terminalde görüntü gösterir
+difftastic|difftastic|Yapıya duyarlı diff (difft)
+mdbook|mdbook|Markdown'dan kitap/site üretir
+typos|typos-cli|Kaynak kodda yazım hatası bulucu
+taplo|taplo-cli|TOML biçimlendirici ve denetleyici
+stylua|stylua|Lua biçimlendirici
+jaq|jaq|jq'nun Rust alternatifi
+onefetch|onefetch|Git deposu özeti
