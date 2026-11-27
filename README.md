@@ -28,3 +28,8 @@ Statik ikililer yalnızca çekirdek ve CPU mimarisine (amd64, i386) bağlıdır.
     jps repo list
     jps hold htop
     jps verify-file dosya      # dosya.sig, openssl ile de doğrulanır
+
+## Barındırma
+
+Paket dosyaları (`*.jps`) git dalına değil, her yayında yeni açılan `pool-<mimari>-<koşu>` **GitHub Release** eklerine yüklenir.
+`repo` dalı yalnızca `index`, `index.sig`, imzalar, `jps-64`/`jps-32` ve `install.sh` içerir. İndeksteki dosya alanı mutlak https adresidir (jps ≥ 0.8.0).

@@ -1,0 +1,28 @@
+# ad|configure bayrakları|açıklama     (en son sürüm https://ftp.gnu.org/gnu/<ad>/ içinden seçilir)
+coreutils|--program-prefix=g --disable-nls|GNU temel araçları, g önekli (gls, gcp, gdate...)
+sed|--program-prefix=g --disable-nls|GNU sed (gsed)
+grep|--program-prefix=g --disable-nls --disable-perl-regexp|GNU grep (ggrep)
+gawk|--disable-nls --without-readline --disable-extensions|GNU awk
+tar|--program-prefix=g --disable-nls|GNU tar (gtar)
+gzip|--program-prefix=g|GNU gzip (ggzip)
+findutils|--program-prefix=g --disable-nls|GNU find ve xargs (gfind, gxargs)
+diffutils|--program-prefix=g --disable-nls|GNU diff araçları (gdiff)
+make|--program-prefix=g --disable-nls --without-guile|GNU make (gmake)
+m4|--disable-nls|GNU m4 makro işlemcisi
+patch|--program-prefix=g|GNU patch (gpatch)
+cpio|--disable-nls|cpio arşivleyici
+ed||GNU ed satır editörü
+time||GNU time: komut süresi ve kaynak ölçer
+gperf||GNU gperf: mükemmel hash üretici
+indent|--disable-nls|C kod biçimlendirici
+bison|--disable-nls|GNU bison ayrıştırıcı üretici
+units|--disable-nls|Birim dönüştürücü
+wdiff|--disable-nls|Kelime bazlı diff
+datamash|--disable-nls|Komut satırı istatistik aracı
+mtools|--disable-nls|MS-DOS disk araçları
+cflow|--disable-nls|C çağrı grafiği çıkarıcı
+cppi|--disable-nls|C önişlemci girinti denetleyici
+ddrescue||Hasarlı disklerden veri kurtarma
+hello|--disable-nls|GNU hello
+ccd2cue|--disable-nls|CCD'den CUE'ye çevirici
+bash|--without-bash-malloc --enable-static-link --disable-nls|GNU bash kabuğu

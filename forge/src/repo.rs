@@ -225,7 +225,8 @@ fn parse_index(t: &str, url: &str) -> Vec<RepoEntry> {
         if f[2] != "all" && f[2] != host {
             continue;
         }
-        if !valid_name(f[0]) || safe_rel(f[5]).is_none() {
+        let file_ok = (f[5].starts_with("https://") && !f[5].chars().any(|c| c.is_whitespace() || c.is_control())) || safe_rel(f[5]).is_some();
+        if !valid_name(f[0]) || !file_ok {
             continue;
         }
         v.push(RepoEntry {
@@ -774,7 +775,8 @@ fn execute(plan: Vec<Item>, o: &Opts, yes: bool, trusted_files: bool) -> Result<
                     && fs::read(&dest).map(|d| sha_hex(&d) == e.sha).unwrap_or(false);
                 if !cached_ok {
                     eprintln!("↓ {} {}", e.name, e.version);
-                    fetch(&format!("{}/{}", e.url, e.file), &dest)?;
+                    let src = if e.file.starts_with("https://") { e.file.clone() } else { format!("{}/{}", e.url, e.file) };
+                    fetch(&src, &dest)?;
                 }
                 let data = fs::read(&dest)?;
                 if sha_hex(&data) != e.sha {

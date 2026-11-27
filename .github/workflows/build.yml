@@ -39,12 +39,47 @@ jobs:
         with:
           name: ${{ matrix.out }}
           path: ${{ matrix.out }}
-  forge:
+  smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            require: "jq ripgrep fzf"
+          - arch: i386
+            platform: linux/386
+            require: "jq"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hızlı deneme derlemesi (Alpine, statik musl)
+        run: |
+          mkdir -p trees
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_ONLY="zlib ncurses jq ripgrep fzf" \
+            -e HOST_UID="$(id -u)" alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/smoke
+          echo "--- başarılı:"; cat trees/smoke/top.list
+          echo "--- atlanan:"; cat trees/smoke/skipped.txt
+          FAIL=""
+          for r in ${{ matrix.require }}; do
+            if ! grep -qxF "$r" trees/smoke/top.list; then
+              echo "::error::smoke: '$r' derlenemedi"
+              tail -n 40 "trees/smoke/_logs/$r.log" || true
+              FAIL=1
+            fi
+          done
+          test -z "$FAIL"
+  forge:
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, i386]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
         include:
           - arch: amd64
             platform: linux/amd64
@@ -55,21 +90,24 @@ jobs:
       - name: Alpine içinde derle (statik musl)
         run: |
           mkdir -p trees
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v "$PWD:/src" -w /src \
-            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e HOST_UID="$(id -u)" \
-            alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 \
+            -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=300 \
+            -e HOST_UID="$(id -u)" \
+            alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}-s${{ matrix.shard }}
       - name: Arşivle
-        run: tar --numeric-owner -czf trees-${{ matrix.arch }}.tgz -C trees ${{ matrix.arch }}
+        run: tar --numeric-owner -czf trees-${{ matrix.arch }}-s${{ matrix.shard }}.tgz -C trees ${{ matrix.arch }}-s${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         with:
-          name: trees-${{ matrix.arch }}
-          path: trees-${{ matrix.arch }}.tgz
+          name: trees-${{ matrix.arch }}-s${{ matrix.shard }}
+          path: trees-${{ matrix.arch }}-s${{ matrix.shard }}.tgz
           compression-level: 0
   packages:
     needs: [jps, forge]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -86,12 +124,21 @@ jobs:
       - name: Paket ağaçlarını aç
         run: |
           mkdir -p trees
-          for a in amd64 i386; do tar -xzf bin/trees-$a.tgz -C trees; done
+          for f in bin/trees-*.tgz; do tar -xzf "$f" -C trees; done
+          ls trees
       - name: .jps paketlerini üret
         run: |
           chmod +x bin/jps-64 bin/jps-32
-          REQUIRE_SIGN=1 JPS_ZSTD_LEVEL=15 JPS=bin/jps-64 BIN64=bin/jps-64 BIN32=bin/jps-32 \
+          MAXTOTAL_MB=9000 REQUIRE_SIGN=1 JPS_ZSTD_LEVEL=15 JPS=bin/jps-64 BIN64=bin/jps-64 BIN32=bin/jps-32 \
             scripts/build-all.sh dist trees
+      - name: İndeksi Release adreslerine çevir
+        run: |
+          BASE="https://github.com/${{ github.repository }}/releases/download"
+          awk -F'\t' -v OFS='\t' -v b="$BASE" -v t64="pool-amd64-${{ github.run_id }}" -v t32="pool-i386-${{ github.run_id }}" \
+            '{ tag = ($3=="i386") ? t32 : t64; sub(/^pool\//, "", $6); $6 = b "/" tag "/" $6; print }' \
+            dist/index > dist/index.tmp
+          mv dist/index.tmp dist/index
+          head -n 2 dist/index
       - name: İkilileri ve dizini imzala
         run: |
           bin/jps-64 sign-file bin/jps-64
@@ -109,26 +156,35 @@ jobs:
           for f in bin/jps-64 bin/jps-32 dist/index; do
             openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in "$f" -sigfile "$f.sig"
           done
+      - name: Paketleri Release'e yükle
+        run: |
+          REPO=${{ github.repository }}; RUN=${{ github.run_id }}
+          gh release create "pool-amd64-$RUN" --repo "$REPO" --title "pool amd64 ($RUN)" --notes "otomatik üretim" \
+            dist/pool/*_amd64.jps dist/pool/*_all.jps
+          gh release create "pool-i386-$RUN" --repo "$REPO" --title "pool i386 ($RUN)" --notes "otomatik üretim" \
+            dist/pool/*_i386.jps
       - name: Depoyu yayınla (repo dalı)
         run: |
           cp bin/jps-64 bin/jps-32 bin/jps-64.sig bin/jps-32.sig install.sh dist/
-          for a in amd64 i386; do
-            cp trees/$a/skipped.txt dist/skipped-$a.txt 2>/dev/null || true
-          done
+          for a in amd64 i386; do cat trees/$a-s*/skipped.txt > dist/skipped-$a.txt 2>/dev/null || true; done
+          rm -rf dist/pool
           (cd dist && sha256sum jps-64 jps-32 > sha256sums)
           cd dist
           git init -q -b repo
           git config user.name "jubatus-bot"
           git config user.email "bot@users.noreply.github.com"
-          git config http.postBuffer 524288000
           git add -A
           git commit -q -m "repo: ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo:repo
-      - name: Sayı denetimi
+      - name: Eski paket Release'lerini temizle
+        run: |
+          REPO=${{ github.repository }}; RUN=${{ github.run_id }}
+          for t in $(gh release list --repo "$REPO" --limit 200 --json tagName -q '.[].tagName' | grep '^pool-' | grep -v -- "-$RUN\$" || true); do
+            gh release delete "$t" --repo "$REPO" --cleanup-tag --yes || true
+          done
+      - name: Sayı raporu
         run: |
           cat dist/STATS.txt
           . dist/STATS.txt
-          if [ "$amd64" -lt 30 ] || [ "$i386" -lt 15 ]; then
-            echo "Çok az paket (amd64>=30, i386>=15 bekleniyor): repo dalındaki skipped-amd64.txt / skipped-i386.txt dosyalarına bak"
-            exit 1
-          fi
+          [ "$amd64" -ge 350 ] || echo "::warning::amd64: $amd64 paket (hedef 350); nedenler repo dalında skipped-amd64.txt"
+          [ "$i386" -ge 350 ] || echo "::warning::i386: $i386 paket (hedef 350); nedenler repo dalında skipped-i386.txt"

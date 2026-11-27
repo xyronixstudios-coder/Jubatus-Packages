@@ -1,35 +1,15 @@
-# ad|crates.io paketi|açıklama
-ripgrep|ripgrep|Çok hızlı metin arama (rg)
-fd|fd-find|Hızlı ve kolay dosya bulucu (fd)
-bat|bat|Sözdizimi renklendiren, git destekli cat
-zoxide|zoxide|Akıllı cd: sık gidilen dizinleri öğrenir
-hyperfine|hyperfine|Komut satırı kıyaslama aracı
-tokei|tokei|Kod satırı istatistiği
-dust|du-dust|Görsel disk kullanımı (dust)
-sd|sd|Sezgisel bul-değiştir (sed alternatifi)
-hexyl|hexyl|Renkli hex görüntüleyici
-procs|procs|Modern ps alternatifi
-bottom|bottom|Grafiksel sistem izleyici (btm)
-lsd|lsd|Renkli ve ikonlu ls
-eza|eza|Modern ls alternatifi
-tealdeer|tealdeer|Hızlı tldr istemcisi
-just|just|Proje komut çalıştırıcı
-xh|xh|Kullanıcı dostu HTTP istemcisi
-gping|gping|Grafikli ping
-dua|dua-cli|Etkileşimli disk kullanımı (dua)
-watchexec|watchexec-cli|Dosya değişince komut çalıştırır
-git-delta|git-delta|Git diff görüntüleyici (delta)
-ouch|ouch|Arşiv aç/sıkıştır (tek komut)
-grex|grex|Örneklerden düzenli ifade üretir
-choose|choose|cut/awk için insan dostu alternatif
-mdcat|mdcat|Markdown'ı terminalde gösterir
-fnm|fnm|Hızlı Node.js sürüm yöneticisi
-pastel|pastel|Renk aracı
-viu|viu|Terminalde görüntü gösterir
-difftastic|difftastic|Yapıya duyarlı diff (difft)
-mdbook|mdbook|Markdown'dan kitap/site üretir
-typos|typos-cli|Kaynak kodda yazım hatası bulucu
-taplo|taplo-cli|TOML biçimlendirici ve denetleyici
-stylua|stylua|Lua biçimlendirici
-jaq|jaq|jq'nun Rust alternatifi
-onefetch|onefetch|Git deposu özeti
+# Boşlukla ayrılmış girdiler: crate  veya  paketadı=crate   (alt çizgi paket adında '-' olur)
+ripgrep fd=fd-find bat eza lsd zoxide hyperfine tokei dust=du-dust sd hexyl procs bottom tealdeer just xh gping
+dua=dua-cli watchexec=watchexec-cli delta=git-delta ouch grex choose mdcat fnm pastel viu difftastic mdbook
+typos=typos-cli taplo=taplo-cli stylua jaq onefetch starship bandwhich topgrade bacon cargo-watch cargo-audit
+cargo-deny cargo-nextest cargo-make cargo-expand cargo-bloat cargo-license cargo-machete cargo-sort cargo-edit
+fselect skim ast-grep ruplacer fastmod sad rnr hck huniq xsv xan csvlens tabiew htmlq jless csview toml-cli rage
+b3sum oha miniserve static-web-server websocat lychee bore-cli rathole trippy pueue pueued fclones diskonaut
+gitui git-absorb git-cliff cocogitto convco gitoxide broot xplr joshuto felix mcfly navi ttyper asciinema agg
+genact lolcrab cowsay rusty-rain pipes-rs macchina zenith systemctl-tui trashy rm-improved wasm-pack
+wasm-bindgen-cli trunk cbindgen rustfilt flamegraph inferno samply tokio-console zola oxipng selene shellharden
+tree-sitter-cli dprint mask hurl ripsecret kondo tre-command tidy-viewer qrrs bingrep dtool ripgrep_all
+cargo-binstall cargo-generate cargo-release cargo-show-asm cargo-update sccache rsign2 dysk lfs kalker fend
+numbat-cli xcp repgrep nomino wiki-tui gex lazyjj jj-cli gitu git-branchless mdbook-mermaid mdbook-toc binsider
+oxker rustscan erdtree dirstat-rs presenterm hwatch viddy mprocs sheldon atuin vivid bunyan tailspin
+angle-grinder pdu=parallel-disk-usage cpc uutils=coreutils uu-diffutils=diffutils lemmeknow
