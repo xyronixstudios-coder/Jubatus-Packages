@@ -23,10 +23,11 @@ JOBS=$(nproc 2>/dev/null || echo 2)
 SHARDS=${FORGE_SHARDS:-0}
 SHARD=${FORGE_SHARD:-0}
 BUDGET=${FORGE_BUDGET_MIN:-0}
-START=$(date +%s)
+START=$SECONDS
 mkdir -p "$WORK" "$DL" "$SYSROOT" "$OUT/_logs"
 touch "$LOCK"
-: > "$OUT/top.list"; : > "$OUT/skipped.txt"; : > "$OUT/allowed.txt"
+if [ -z "${FORGE_APPEND:-}" ]; then : > "$OUT/top.list"; : > "$OUT/skipped.txt"; : > "$OUT/allowed.txt"; fi
+touch "$OUT/top.list" "$OUT/skipped.txt" "$OUT/allowed.txt"
 
 export PREFIX JOBS SYSROOT FORCE_UNSAFE_CONFIGURE=1 MAKEINFO=true
 export CFLAGS="-O2 -pipe" CXXFLAGS="-O2 -pipe"
@@ -38,7 +39,7 @@ export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 
 want()       { [ -z "${FORGE_ONLY:-}" ] && return 0; case " $FORGE_ONLY " in *" $1 "*) return 0 ;; esac; return 1; }
 mine()       { [ -n "${FORGE_ONLY:-}" ] && return 0; [ "$SHARDS" -le 1 ] && return 0; [ $(( $1 % SHARDS )) -eq "$SHARD" ]; }
-out_of_time(){ [ "$BUDGET" -gt 0 ] && [ $(( $(date +%s) - START )) -ge $(( BUDGET * 60 )) ]; }
+out_of_time(){ [ "$BUDGET" -gt 0 ] && [ $(( SECONDS - START )) -ge $(( BUDGET * 60 )) ]; }
 say_ok()     { echo "$1" >> "$OUT/top.list"; echo "  ✔ $1 ${2:-}"; }
 say_skip()   { echo "$1: $2" >> "$OUT/skipped.txt"; echo "  ✘ $1: $2"; }
 errtail()    { tail -n 4 "$OUT/_logs/$1.log" 2>/dev/null | tr '\n\t' '  ' | cut -c1-220; }
@@ -46,6 +47,8 @@ show_fail()  { tail -n 8 "$OUT/_logs/$1.log" 2>/dev/null | cut -c1-200 | sed 's/
 valid_pkg()  { case "$1" in ''|*[!a-z0-9+.-]*|[!a-z0-9]*) return 1 ;; esac; [ "${#1}" -ge 2 ]; }
 nonempty()   { [ -n "$(find "$1" \( -type f -o -type l \) 2>/dev/null | head -n1)" ]; }
 tokens()     { sed 's/#.*//' "$1" | tr -s ' \t\r\n' '\n' | sed '/^$/d'; }
+
+has_phase() { case " ${FORGE_PHASES:-c gnu rust go} " in *" $1 "*) return 0 ;; esac; return 1; }
 
 write_control() {   # ad sürüm bağımlılıklar açıklama kaynak-url kaynak-sha
   local desc
@@ -137,8 +140,8 @@ run_cargo() {       # ad crate
     exec > "$OUT/_logs/$1.log" 2>&1
     unset PKG_CONFIG PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR CPPFLAGS LDFLAGS
     T="$OUT/$1"; rm -rf "$T"; mkdir -p "$T/root$PREFIX" "$T/JPS"
-    HOST=$(rustc -vV | sed -n 's/^host: //p')
-    export CARGO_HOME="$WORK/cargo-home" RUSTFLAGS="-C target-feature=+crt-static"
+    HOST=${FORGE_RUST_TARGET:-$(rustc -vV | sed -n 's/^host: //p')}
+    export CARGO_HOME="$WORK/cargo-home" RUSTFLAGS="-C target-feature=+crt-static" CARGO_NET_RETRY=10 CARGO_HTTP_TIMEOUT=60
     export CARGO_PROFILE_RELEASE_STRIP=symbols CARGO_PROFILE_RELEASE_DEBUG=0
     timeout 2700 cargo install --locked --target "$HOST" --target-dir "$WORK/cargo-target/$1" \
       --root "$T/root$PREFIX" -j "$JOBS" "$2"
@@ -152,6 +155,10 @@ run_cargo() {       # ad crate
     d=""
     if [ -n "$src" ] && [ -f "$src/Cargo.toml" ]; then
       d=$(sed -n 's/^description *= *"\(.*\)" *$/\1/p' "$src/Cargo.toml" | head -n1 | tr -d '\\')
+    fi
+    case "$d" in '"'*) d="" ;; esac
+    if [ -z "$d" ] && [ -n "$src" ] && [ -f "$src/Cargo.toml" ]; then
+      d=$(awk '/^description *= *"""/{f=1; next} f{print; exit}' "$src/Cargo.toml" | sed 's/^[[:space:]]*//; s/[[:space:]\\]*$//' | tr -d '\\"')
     fi
     [ -n "$d" ] || d="$2 (Rust)"
     write_control "$1" "$ver" "" "$d" "crates.io:$2" ""
@@ -171,7 +178,7 @@ run_go() {          # ad modül
     exec > "$OUT/_logs/$1.log" 2>&1
     unset PKG_CONFIG PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR CPPFLAGS LDFLAGS
     T="$OUT/$1"; rm -rf "$T"; mkdir -p "$T/root$PREFIX/bin" "$T/JPS"
-    export GOPATH="$WORK/gopath" GOCACHE="$WORK/gocache" GOBIN="$T/root$PREFIX/bin" CGO_ENABLED=0
+    export GOPATH="$WORK/gopath" GOCACHE="$WORK/gocache" GOBIN="$T/root$PREFIX/bin" CGO_ENABLED=0 GOTOOLCHAIN=auto GOPROXY=https://proxy.golang.org,direct
     timeout 2400 go install -trimpath -ldflags='-s -w' "$2@latest"
     bin=$(ls "$GOBIN" | head -n1)
     [ -n "$bin" ] || { echo "ikili üretilmedi"; exit 1; }
@@ -196,7 +203,7 @@ gnu_recipe() {      # ad bayraklar açıklama -> $WORK/gnu/<ad>.sh (en son sür�
 }
 
 # ───────────── 1) el yazısı C tarifleri (yalnızca 0. parça) ─────────────
-if [ -n "${FORGE_ONLY:-}" ] || [ "$SHARDS" -le 1 ] || [ "$SHARD" -eq 0 ]; then
+if has_phase c && { [ -n "${FORGE_ONLY:-}" ] || [ "$SHARDS" -le 1 ] || [ "$SHARD" -eq 0 ]; }; then
   echo "== Forge ($ARCH): C tarifleri =="
   while IFS= read -r rn; do
     case "$rn" in ''|'#'*) continue ;; esac
@@ -219,6 +226,7 @@ fi
 echo "== Forge ($ARCH, parça $SHARD/$SHARDS): GNU =="
 i=0
 while IFS='|' read -r name flags desc; do
+  has_phase gnu || break
   case "$name" in ''|'#'*) continue ;; esac
   i=$((i+1))
   want "$name" || continue
@@ -237,6 +245,7 @@ echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Rust =="
 i=0
 while IFS= read -r tok; do
   i=$((i+1))
+  has_phase rust || break
   if [[ "$tok" == *=* ]]; then name=${tok%%=*}; crate=${tok#*=}; else crate=$tok; name=$(printf '%s' "$tok" | tr 'A-Z_' 'a-z-'); fi
   want "$name" || continue
   mine "$i" || continue
@@ -254,6 +263,7 @@ echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Go =="
 i=0
 while IFS= read -r tok; do
   i=$((i+1))
+  has_phase go || break
   if [[ "$tok" == *=* ]]; then name=${tok%%=*}; mod=${tok#*=}; else mod=$tok; name=$(go_name "$tok"); fi
   want "$name" || continue
   mine "$i" || continue
@@ -285,5 +295,5 @@ while [ "$changed" = 1 ]; do
   done < <(cat "$OUT/top.list")
 done
 
-echo "== Özet ($ARCH, parça $SHARD/$SHARDS): $(wc -l < "$OUT/top.list") paket, $(wc -l < "$OUT/skipped.txt") atlanan, $(( $(date +%s) - START )) sn =="
+echo "== Özet ($ARCH, parça $SHARD/$SHARDS): $(wc -l < "$OUT/top.list") paket, $(wc -l < "$OUT/skipped.txt") atlanan, $(( SECONDS - START )) sn =="
 exit 0

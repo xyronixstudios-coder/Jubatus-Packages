@@ -5,7 +5,7 @@ src_url=https://busybox.net/downloads/busybox-1.36.1.tar.bz2
 build() {
   make defconfig
   sed -i -e 's/^# CONFIG_STATIC is not set/CONFIG_STATIC=y/' -e 's/^CONFIG_TC=y/# CONFIG_TC is not set/' .config
-  yes "" | make oldconfig >/dev/null
+  ( yes "" | make oldconfig >/dev/null 2>&1 ) || true
   make -j"$JOBS"
 }
 package() { install -Dm755 busybox "$PKGDIR$PREFIX/bin/busybox"; }

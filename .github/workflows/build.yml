@@ -54,11 +54,11 @@ jobs:
             require: "jq"
     steps:
       - uses: actions/checkout@v4
-      - name: Hızlı deneme derlemesi (Alpine, statik musl)
+      - name: Hızlı deneme derlemesi (Alpine, statik musl) ve çalıştırma denemesi
         run: |
           mkdir -p trees
-          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_ONLY="zlib ncurses jq ripgrep fzf" \
+          docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_ONLY="zlib ncurses jq hello ripgrep fzf" \
             -e HOST_UID="$(id -u)" alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/smoke
           echo "--- başarılı:"; cat trees/smoke/top.list
           echo "--- atlanan:"; cat trees/smoke/skipped.txt
@@ -68,6 +68,15 @@ jobs:
               echo "::error::smoke: '$r' derlenemedi"
               tail -n 40 "trees/smoke/_logs/$r.log" || true
               FAIL=1
+            fi
+          done
+          for r in ${{ matrix.require }} hello; do
+            b=$(find "trees/smoke/$r/root/usr/local/bin" -type f 2>/dev/null | head -n1 || true)
+            [ -n "$b" ] || continue
+            if "$b" --version >/dev/null 2>&1; then
+              echo "✔ başka dağıtımda (Ubuntu) çalışıyor: $r — $(file -b "$b" | cut -c1-70)"
+            else
+              echo "::error::smoke: $r çalıştırılamadı"; FAIL=1
             fi
           done
           test -z "$FAIL"
@@ -90,11 +99,23 @@ jobs:
       - name: Alpine içinde derle (statik musl)
         run: |
           mkdir -p trees
-          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 \
-            -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=300 \
+          PH="c gnu rust go"; BUD=300
+          if [ "${{ matrix.arch }}" = i386 ]; then PH="c gnu go"; BUD=150; fi
+          docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_PHASES="$PH" \
+            -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=$BUD \
             -e HOST_UID="$(id -u)" \
             alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}-s${{ matrix.shard }}
+      - name: Rust (i386: Debian i386 konteyneri, i686-musl hedefi)
+        if: matrix.arch == 'i386'
+        continue-on-error: true
+        run: |
+          docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform linux/386 -v "$PWD:/src" -w /src \
+            -e FORGE_ARCH=i386 -e FORGE_STRICT=1 -e FORGE_PHASES="rust" -e FORGE_APPEND=1 \
+            -e FORGE_RUST_TARGET=i686-unknown-linux-musl \
+            -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=150 \
+            -e HOST_UID="$(id -u)" \
+            debian:bookworm-slim bash scripts/forge/ci-entry-deb32.sh /src/trees/i386-s${{ matrix.shard }}
       - name: Arşivle
         run: tar --numeric-owner -czf trees-${{ matrix.arch }}-s${{ matrix.shard }}.tgz -C trees ${{ matrix.arch }}-s${{ matrix.shard }}
       - uses: actions/upload-artifact@v4

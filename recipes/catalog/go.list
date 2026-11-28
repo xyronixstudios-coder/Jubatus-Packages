@@ -1,11 +1,11 @@
 # Boşlukla ayrılmış girdiler: modül/yolu  veya  paketadı=modül/yolu   (paket adı yolun son öğesinden türetilir)
 github.com/junegunn/fzf github.com/jesseduffield/lazygit github.com/jesseduffield/lazydocker
 github.com/mikefarah/yq/v4 github.com/charmbracelet/glow github.com/charmbracelet/gum
-github.com/zyedidia/micro/v2/cmd/micro github.com/muesli/duf github.com/wagoodman/dive
+github.com/muesli/duf github.com/wagoodman/dive
 github.com/dundee/gdu/v5/cmd/gdu github.com/schollz/croc/v10 github.com/direnv/direnv/v2
 filippo.io/age/cmd/age mvdan.cc/sh/v3/cmd/shfmt github.com/go-task/task/v3/cmd/task
 github.com/itchyny/gojq/cmd/gojq github.com/twpayne/chezmoi/v2 github.com/antonmedv/fx
-github.com/bcicen/ctop github.com/gokcehan/lf github.com/tomwright/dasel/v2/cmd/dasel filippo.io/mkcert
+github.com/gokcehan/lf github.com/tomwright/dasel/v2/cmd/dasel filippo.io/mkcert
 github.com/restic/restic/cmd/restic github.com/cli/cli/v2/cmd/gh github.com/rclone/rclone
 github.com/caddyserver/caddy/v2/cmd/caddy github.com/stern/stern github.com/ahmetb/kubectx/cmd/kubectx
 github.com/ahmetb/kubectx/cmd/kubens sigs.k8s.io/kind sigs.k8s.io/kustomize/kustomize/v5
