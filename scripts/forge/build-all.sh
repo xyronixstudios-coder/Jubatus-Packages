@@ -158,7 +158,7 @@ run_cargo() {       # ad crate
     fi
     case "$d" in '"'*) d="" ;; esac
     if [ -z "$d" ] && [ -n "$src" ] && [ -f "$src/Cargo.toml" ]; then
-      d=$(awk '/^description *= *"""/{f=1; next} f{print; exit}' "$src/Cargo.toml" | sed 's/^[[:space:]]*//; s/[[:space:]\\]*$//' | tr -d '\\"')
+      d=$(awk '/^description *= *"""/{f=1; next} f && /"""/ {exit} f {printf "%s ", $0}' "$src/Cargo.toml" | sed 's/^[[:space:]]*//; s/[[:space:]\\]*$//' | tr -d '\\"')
     fi
     [ -n "$d" ] || d="$2 (Rust)"
     write_control "$1" "$ver" "" "$d" "crates.io:$2" ""
