@@ -4,12 +4,12 @@ dua=dua-cli watchexec=watchexec-cli delta=git-delta ouch grex choose mdcat fnm p
 typos=typos-cli taplo=taplo-cli stylua jaq onefetch starship bandwhich topgrade bacon cargo-watch cargo-audit
 cargo-deny cargo-nextest cargo-make cargo-expand cargo-bloat cargo-license cargo-machete cargo-sort cargo-edit
 fselect skim ast-grep ruplacer fastmod sad rnr hck huniq xsv xan csvlens tabiew htmlq jless csview toml-cli rage
-b3sum oha miniserve static-web-server websocat lychee bore-cli rathole trippy pueue pueued fclones diskonaut
+b3sum oha miniserve static-web-server websocat lychee bore-cli rathole trippy pueue fclones diskonaut
 gitui git-absorb git-cliff cocogitto convco gitoxide broot xplr joshuto felix mcfly navi ttyper asciinema agg
 genact lolcrab cowsay rusty-rain pipes-rs macchina zenith systemctl-tui trashy rm-improved wasm-pack
 wasm-bindgen-cli trunk cbindgen rustfilt flamegraph inferno samply tokio-console zola oxipng selene shellharden
-tree-sitter-cli dprint mask hurl ripsecret kondo tre-command tidy-viewer qrrs bingrep dtool ripgrep_all
+tree-sitter-cli dprint mask hurl ripsecrets kondo tre-command tidy-viewer qrrs bingrep dtool ripgrep_all
 cargo-binstall cargo-generate cargo-release cargo-show-asm cargo-update sccache rsign2 dysk lfs kalker fend
 numbat-cli xcp repgrep nomino wiki-tui gex lazyjj jj-cli gitu git-branchless mdbook-mermaid mdbook-toc binsider
 oxker rustscan erdtree dirstat-rs presenterm hwatch viddy mprocs sheldon atuin vivid bunyan tailspin
-angle-grinder pdu=parallel-disk-usage cpc uutils=coreutils uu-diffutils=diffutils lemmeknow
+angle-grinder=ag pdu=parallel-disk-usage cpc uutils=coreutils uu-diffutils=diffutils lemmeknow

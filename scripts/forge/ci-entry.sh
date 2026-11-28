@@ -3,7 +3,7 @@
 set -eu
 OUT=$1
 apk add --no-cache bash build-base linux-headers curl ca-certificates coreutils tar xz bzip2 gzip \
-  findutils sed grep gawk patch perl python3 pkgconf bison flex m4 git file
+  findutils sed grep gawk patch perl python3 pkgconf bison flex m4 git file unzip jq
 PHASES="${FORGE_PHASES:-c gnu rust go}"
 case " $PHASES " in
   *" rust "*)

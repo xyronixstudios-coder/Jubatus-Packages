@@ -4,7 +4,7 @@ github.com/mikefarah/yq/v4 github.com/charmbracelet/glow github.com/charmbracele
 github.com/muesli/duf github.com/wagoodman/dive
 github.com/dundee/gdu/v5/cmd/gdu github.com/schollz/croc/v10 github.com/direnv/direnv/v2
 filippo.io/age/cmd/age mvdan.cc/sh/v3/cmd/shfmt github.com/go-task/task/v3/cmd/task
-github.com/itchyny/gojq/cmd/gojq github.com/twpayne/chezmoi/v2 github.com/antonmedv/fx
+github.com/itchyny/gojq/cmd/gojq github.com/antonmedv/fx
 github.com/gokcehan/lf github.com/tomwright/dasel/v2/cmd/dasel filippo.io/mkcert
 github.com/restic/restic/cmd/restic github.com/cli/cli/v2/cmd/gh github.com/rclone/rclone
 github.com/caddyserver/caddy/v2/cmd/caddy github.com/stern/stern github.com/ahmetb/kubectx/cmd/kubectx
@@ -25,10 +25,10 @@ github.com/git-lfs/git-lfs/v3 github.com/maaslalani/slides github.com/charmbrace
 github.com/charmbracelet/freeze github.com/charmbracelet/mods github.com/knqyf263/pet
 github.com/derailed/popeye github.com/gruntwork-io/terragrunt github.com/itchyny/bed/cmd/bed
 github.com/nao1215/gup github.com/rs/curlie github.com/nektos/act github.com/securego/gosec/v2/cmd/gosec
-github.com/gitleaks/gitleaks/v8 github.com/cheat/cheat/cmd/cheat github.com/antonmedv/walk
+ github.com/cheat/cheat/cmd/cheat github.com/antonmedv/walk
 github.com/mistakenelf/fm github.com/peco/peco/cmd/peco github.com/mattn/goreman github.com/DarthSim/hivemind
 gotest.tools/gotestsum github.com/pressly/goose/v3/cmd/goose github.com/sqlc-dev/sqlc/cmd/sqlc
 github.com/bufbuild/buf/cmd/buf google.golang.org/protobuf/cmd/protoc-gen-go github.com/minio/mc
-github.com/prometheus/node_exporter github.com/prometheus/blackbox_exporter github.com/cue-lang/cue/cmd/cue
+github.com/prometheus/node_exporter github.com/prometheus/blackbox_exporter
 github.com/google/gops github.com/google/yamlfmt/cmd/yamlfmt github.com/ankitpokhrel/jira-cli/cmd/jira
-github.com/gopasspw/gopass github.com/bitnami-labs/sealed-secrets/cmd/kubeseal github.com/boyter/scc/v3
+github.com/gopasspw/gopass github.com/boyter/scc/v3

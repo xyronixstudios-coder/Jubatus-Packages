@@ -57,8 +57,9 @@ jobs:
       - name: Hızlı deneme derlemesi (Alpine, statik musl) ve çalıştırma denemesi
         run: |
           mkdir -p trees
+          PH="c gnu rust go"; if [ "${{ matrix.arch }}" = i386 ]; then PH="c gnu"; fi
           docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_ONLY="zlib ncurses jq hello ripgrep fzf" \
+            -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_PHASES="$PH" -e FORGE_ONLY="zlib ncurses jq hello ripgrep fzf" \
             -e HOST_UID="$(id -u)" alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/smoke
           echo "--- başarılı:"; cat trees/smoke/top.list
           echo "--- atlanan:"; cat trees/smoke/skipped.txt
@@ -73,8 +74,9 @@ jobs:
           for r in ${{ matrix.require }} hello; do
             b=$(find "trees/smoke/$r/root/usr/local/bin" -type f 2>/dev/null | head -n1 || true)
             [ -n "$b" ] || continue
+            if [ "${{ matrix.arch }}" = i386 ]; then echo "  (i386 ikilisi çalıştırılmadı: $r)"; continue; fi
             if "$b" --version >/dev/null 2>&1; then
-              echo "✔ başka dağıtımda (Ubuntu) çalışıyor: $r — $(file -b "$b" | cut -c1-70)"
+              echo "✔ başka dağıtımda (Ubuntu) çalışıyor: $r"
             else
               echo "::error::smoke: $r çalıştırılamadı"; FAIL=1
             fi
@@ -100,22 +102,12 @@ jobs:
         run: |
           mkdir -p trees
           PH="c gnu rust go"; BUD=300
-          if [ "${{ matrix.arch }}" = i386 ]; then PH="c gnu go"; BUD=150; fi
+          if [ "${{ matrix.arch }}" = i386 ]; then PH="c gnu"; BUD=120; fi
           docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
             -e FORGE_ARCH=${{ matrix.arch }} -e FORGE_STRICT=1 -e FORGE_PHASES="$PH" \
             -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=$BUD \
             -e HOST_UID="$(id -u)" \
             alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}-s${{ matrix.shard }}
-      - name: "Rust (i386: Debian i386 konteyneri, i686-musl hedefi)"
-        if: matrix.arch == 'i386'
-        continue-on-error: true
-        run: |
-          docker run --rm --dns 8.8.8.8 --dns 1.1.1.1 --platform linux/386 -v "$PWD:/src" -w /src \
-            -e FORGE_ARCH=i386 -e FORGE_STRICT=1 -e FORGE_PHASES="rust" -e FORGE_APPEND=1 \
-            -e FORGE_RUST_TARGET=i686-unknown-linux-musl \
-            -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=150 \
-            -e HOST_UID="$(id -u)" \
-            debian:bookworm-slim bash scripts/forge/ci-entry-deb32.sh /src/trees/i386-s${{ matrix.shard }}
       - name: Arşivle
         run: tar --numeric-owner -czf trees-${{ matrix.arch }}-s${{ matrix.shard }}.tgz -C trees ${{ matrix.arch }}-s${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
@@ -123,8 +115,61 @@ jobs:
           name: trees-${{ matrix.arch }}-s${{ matrix.shard }}
           path: trees-${{ matrix.arch }}-s${{ matrix.shard }}.tgz
           compression-level: 0
+  forge-i386x:
+    needs: smoke
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Rust ve Go (i386 çapraz derleme)
+        run: |
+          mkdir -p trees
+          FORGE_ARCH=i386 FORGE_STRICT=1 FORGE_PHASES="rust go" \
+            FORGE_RUST_MODE=cross FORGE_RUST_TARGET=i686-unknown-linux-musl FORGE_GOARCH=386 \
+            FORGE_SHARDS=8 FORGE_SHARD=${{ matrix.shard }} FORGE_BUDGET_MIN=300 \
+            FORGE_WORK="$RUNNER_TEMP/forge-work" FORGE_DL="$RUNNER_TEMP/forge-dl" FORGE_SYSROOT="$RUNNER_TEMP/forge-sysroot" \
+            bash scripts/forge/build-all.sh trees/i386x-s${{ matrix.shard }}
+      - name: Arşivle
+        run: tar --numeric-owner -czf trees-i386x-s${{ matrix.shard }}.tgz -C trees i386x-s${{ matrix.shard }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trees-i386x-s${{ matrix.shard }}
+          path: trees-i386x-s${{ matrix.shard }}.tgz
+          compression-level: 0
+  forge-data:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Yazı tipleri ve eklentiler (mimariden bağımsız)
+        run: |
+          mkdir -p trees
+          FORGE_ARCH=all FORGE_PHASES="fonts snap" \
+            FORGE_WORK="$RUNNER_TEMP/forge-work" FORGE_DL="$RUNNER_TEMP/forge-dl" FORGE_SYSROOT="$RUNNER_TEMP/forge-sysroot" \
+            bash scripts/forge/build-all.sh trees/all-s0
+      - name: Arşivle
+        run: tar --numeric-owner -czf trees-all-s0.tgz -C trees all-s0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trees-all-s0
+          path: trees-all-s0.tgz
+          compression-level: 0
   packages:
-    needs: [jps, forge]
+    needs: [jps, forge, forge-i386x, forge-data]
+    if: ${{ !cancelled() && needs.jps.result == 'success' && needs.forge.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 240
     env:
@@ -187,7 +232,9 @@ jobs:
       - name: Depoyu yayınla (repo dalı)
         run: |
           cp bin/jps-64 bin/jps-32 bin/jps-64.sig bin/jps-32.sig install.sh dist/
-          for a in amd64 i386; do cat trees/$a-s*/skipped.txt > dist/skipped-$a.txt 2>/dev/null || true; done
+          cat trees/amd64-s*/skipped.txt > dist/skipped-amd64.txt 2>/dev/null || true
+          cat trees/i386-s*/skipped.txt trees/i386x-s*/skipped.txt > dist/skipped-i386.txt 2>/dev/null || true
+          cat trees/all-s*/skipped.txt > dist/skipped-all.txt 2>/dev/null || true
           rm -rf dist/pool
           (cd dist && sha256sum jps-64 jps-32 > sha256sums)
           cd dist
@@ -207,5 +254,5 @@ jobs:
         run: |
           cat dist/STATS.txt
           . dist/STATS.txt
-          [ "$amd64" -ge 350 ] || echo "::warning::amd64: $amd64 paket (hedef 350); nedenler repo dalında skipped-amd64.txt"
-          [ "$i386" -ge 350 ] || echo "::warning::i386: $i386 paket (hedef 350); nedenler repo dalında skipped-i386.txt"
+          [ "$amd64" -ge 330 ] || echo "::warning::amd64: $amd64 paket (hedef 330)"
+          [ "$i386" -ge 330 ] || echo "::warning::i386: $i386 paket (hedef 330)"

@@ -1,0 +1,24 @@
+# ad|github sahibi/depo|kurulum dizini (/usr/local altında)|açıklama   (varsayılan dalın günlük anlık görüntüsü)
+zsh-autosuggestions|zsh-users/zsh-autosuggestions|share/zsh/plugins|Zsh için Fish benzeri otomatik öneriler
+zsh-syntax-highlighting|zsh-users/zsh-syntax-highlighting|share/zsh/plugins|Zsh komut satırı sözdizimi renklendirme
+zsh-completions|zsh-users/zsh-completions|share/zsh/plugins|Zsh için ek tamamlama tanımları
+zsh-history-substring-search|zsh-users/zsh-history-substring-search|share/zsh/plugins|Zsh geçmişinde alt dize arama
+fast-syntax-highlighting|zdharma-continuum/fast-syntax-highlighting|share/zsh/plugins|Hızlı Zsh sözdizimi renklendirme
+zsh-you-should-use|MichaelAquilina/zsh-you-should-use|share/zsh/plugins|Takma adları hatırlatan Zsh eklentisi
+fzf-tab|Aloxaf/fzf-tab|share/zsh/plugins|Zsh tamamlamasını fzf ile değiştirir
+zsh-z|agkozak/zsh-z|share/zsh/plugins|Zsh için z dizin atlayıcı
+powerlevel10k|romkatv/powerlevel10k|share/zsh/themes|Hızlı ve şık Zsh teması
+ohmyzsh|ohmyzsh/ohmyzsh|share|Oh My Zsh çerçevesi
+tmux-tpm|tmux-plugins/tpm|share/tmux/plugins|Tmux eklenti yöneticisi
+tmux-sensible|tmux-plugins/tmux-sensible|share/tmux/plugins|Tmux için mantıklı varsayılanlar
+tmux-resurrect|tmux-plugins/tmux-resurrect|share/tmux/plugins|Tmux oturumlarını kaydedip geri yükler
+tmux-yank|tmux-plugins/tmux-yank|share/tmux/plugins|Tmux'ta sistem panosuna kopyalama
+tmux-continuum|tmux-plugins/tmux-continuum|share/tmux/plugins|Tmux ortamını sürekli kaydeder
+tmux-catppuccin|catppuccin/tmux|share/tmux/plugins|Tmux için Catppuccin teması
+vim-plug|junegunn/vim-plug|share/vim/plugins|Vim eklenti yöneticisi
+vim-fzf|junegunn/fzf.vim|share/vim/plugins|Vim için fzf bütünleşmesi
+vim-nerdtree|preservim/nerdtree|share/vim/plugins|Vim dosya ağacı
+vim-airline|vim-airline/vim-airline|share/vim/plugins|Vim durum çubuğu
+vim-surround|tpope/vim-surround|share/vim/plugins|Vim'de çevreleyen karakterleri düzenleme
+vim-fugitive|tpope/vim-fugitive|share/vim/plugins|Vim için Git sarmalayıcı
+vim-commentary|tpope/vim-commentary|share/vim/plugins|Vim'de yorum satırı aç/kapa

@@ -14,7 +14,6 @@ cpio|--disable-nls|cpio arşivleyici
 ed||GNU ed satır editörü
 time||GNU time: komut süresi ve kaynak ölçer
 gperf||GNU gperf: mükemmel hash üretici
-indent|--disable-nls|C kod biçimlendirici
 bison|--disable-nls|GNU bison ayrıştırıcı üretici
 units|--disable-nls|Birim dönüştürücü
 wdiff|--disable-nls|Kelime bazlı diff
@@ -24,5 +23,4 @@ cflow|--disable-nls|C çağrı grafiği çıkarıcı
 cppi|--disable-nls|C önişlemci girinti denetleyici
 ddrescue||Hasarlı disklerden veri kurtarma
 hello|--disable-nls|GNU hello
-ccd2cue|--disable-nls|CCD'den CUE'ye çevirici
 bash|--without-bash-malloc --enable-static-link --disable-nls|GNU bash kabuğu

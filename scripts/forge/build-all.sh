@@ -1,17 +1,20 @@
 #!/bin/bash
 # Jubatus Forge: tarif (recipe) derleyici.
 # Dağıtımdan bağımsız, STATİK paket ağaçları üretir: <çıktı>/<paket>/{JPS/control,root/...}
-# CI'da Alpine konteynerinde (musl) çalışır. Yerelde de çalışır (statik glibc çıkar, yalnızca deneme içindir).
-#   FORGE_ARCH=amd64|i386     hedef mimari etiketi (zorunlu)
-#   FORGE_STRICT=1            pinlenmemiş el yazısı tarif kaynağını reddet (CI)
-#   FORGE_ONLY="a b c"        yalnızca bu paket adlarını derle (kütüphane bağımlılıklarını da yaz)
-#   FORGE_SHARDS=N FORGE_SHARD=k   katalog girdilerini N parçaya böl, bu işte k. parça (C tarifleri 0. parçada)
-#   FORGE_BUDGET_MIN=dk       bu süreden sonra yeni tarife başlama
-#   FORGE_WORK / FORGE_DL / FORGE_SYSROOT   çalışma, indirme önbelleği ve kütüphane kök dizinleri
+# CI'da Alpine konteynerinde (musl) veya Ubuntu çalıştırıcıda (çapraz derleme) çalışır. Yerelde de çalışır.
+#   FORGE_ARCH=amd64|i386|all   hedef mimari etiketi (zorunlu)
+#   FORGE_PHASES="c gnu rust go fonts snap"   çalışacak aşamalar
+#   FORGE_STRICT=1              pinlenmemiş el yazısı tarif kaynağını reddet (CI)
+#   FORGE_ONLY="a b c"          yalnızca bu paket adlarını derle
+#   FORGE_SHARDS=N FORGE_SHARD=k   katalog girdilerini N parçaya böl (C tarifleri 0. parçada)
+#   FORGE_BUDGET_MIN=dk         bu süreden sonra yeni tarife başlama
+#   FORGE_RUST_MODE=cross FORGE_RUST_TARGET=<hedef>   Rust'ı 'cross' ile crates.io kaynağından derle
+#   FORGE_GOARCH=386            Go'yu çapraz derle
+#   FORGE_APPEND=1              mevcut top.list/skipped.txt'e ekle
 set -uo pipefail
 export LC_ALL=C
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-ARCH=${FORGE_ARCH:?FORGE_ARCH gerekli (amd64|i386)}
+ARCH=${FORGE_ARCH:?FORGE_ARCH gerekli (amd64|i386|all)}
 [ $# -ge 1 ] || { echo "kullanım: build-all.sh <çıktı-dizini>" >&2; exit 2; }
 mkdir -p "$1"; OUT=$(readlink -f "$1")
 PREFIX=/usr/local
@@ -24,6 +27,7 @@ SHARDS=${FORGE_SHARDS:-0}
 SHARD=${FORGE_SHARD:-0}
 BUDGET=${FORGE_BUDGET_MIN:-0}
 START=$SECONDS
+UA="jubatus-forge (https://github.com/xyronixstudios-coder/Jubatus-Packages)"
 mkdir -p "$WORK" "$DL" "$SYSROOT" "$OUT/_logs"
 touch "$LOCK"
 if [ -z "${FORGE_APPEND:-}" ]; then : > "$OUT/top.list"; : > "$OUT/skipped.txt"; : > "$OUT/allowed.txt"; fi
@@ -37,18 +41,18 @@ export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_LIBDIR="$SYSROOT$PREFIX/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 
-want()       { [ -z "${FORGE_ONLY:-}" ] && return 0; case " $FORGE_ONLY " in *" $1 "*) return 0 ;; esac; return 1; }
-mine()       { [ -n "${FORGE_ONLY:-}" ] && return 0; [ "$SHARDS" -le 1 ] && return 0; [ $(( $1 % SHARDS )) -eq "$SHARD" ]; }
-out_of_time(){ [ "$BUDGET" -gt 0 ] && [ $(( SECONDS - START )) -ge $(( BUDGET * 60 )) ]; }
-say_ok()     { echo "$1" >> "$OUT/top.list"; echo "  ✔ $1 ${2:-}"; }
-say_skip()   { echo "$1: $2" >> "$OUT/skipped.txt"; echo "  ✘ $1: $2"; }
-errtail()    { tail -n 4 "$OUT/_logs/$1.log" 2>/dev/null | tr '\n\t' '  ' | cut -c1-220; }
-show_fail()  { tail -n 8 "$OUT/_logs/$1.log" 2>/dev/null | cut -c1-200 | sed 's/^/      | /'; }
-valid_pkg()  { case "$1" in ''|*[!a-z0-9+.-]*|[!a-z0-9]*) return 1 ;; esac; [ "${#1}" -ge 2 ]; }
-nonempty()   { [ -n "$(find "$1" \( -type f -o -type l \) 2>/dev/null | head -n1)" ]; }
-tokens()     { sed 's/#.*//' "$1" | tr -s ' \t\r\n' '\n' | sed '/^$/d'; }
-
-has_phase() { case " ${FORGE_PHASES:-c gnu rust go} " in *" $1 "*) return 0 ;; esac; return 1; }
+want()        { [ -z "${FORGE_ONLY:-}" ] && return 0; case " $FORGE_ONLY " in *" $1 "*) return 0 ;; esac; return 1; }
+mine()        { [ -n "${FORGE_ONLY:-}" ] && return 0; [ "$SHARDS" -le 1 ] && return 0; [ $(( $1 % SHARDS )) -eq "$SHARD" ]; }
+out_of_time() { [ "$BUDGET" -gt 0 ] && [ $(( SECONDS - START )) -ge $(( BUDGET * 60 )) ]; }
+has_phase()   { case " ${FORGE_PHASES:-c gnu rust go} " in *" $1 "*) return 0 ;; esac; return 1; }
+say_ok()      { echo "$1" >> "$OUT/top.list"; echo "  ✔ $1 ${2:-}"; }
+say_skip()    { echo "$1: $2" >> "$OUT/skipped.txt"; echo "  ✘ $1: $2"; }
+errtail()     { tail -n 4 "$OUT/_logs/$1.log" 2>/dev/null | tr '\n\t' '  ' | cut -c1-220; }
+show_fail()   { tail -n 8 "$OUT/_logs/$1.log" 2>/dev/null | cut -c1-200 | sed 's/^/      | /'; }
+valid_pkg()   { case "$1" in ''|*[!a-z0-9+.-]*|[!a-z0-9]*) return 1 ;; esac; [ "${#1}" -ge 2 ]; }
+nonempty()    { [ -n "$(find "$1" \( -type f -o -type l \) 2>/dev/null | head -n1)" ]; }
+tokens()      { sed 's/#.*//' "$1" | tr -s ' \t\r\n' '\n' | sed '/^$/d'; }
+font_pkg()    { printf 'nerd-font-%s' "$(printf '%s' "$1" | tr 'A-Z_' 'a-z-')"; }
 
 write_control() {   # ad sürüm bağımlılıklar açıklama kaynak-url kaynak-sha
   local desc
@@ -80,6 +84,17 @@ prune() {
   find "$r" \( -name '*.a' -o -name '*.la' \) -delete 2>/dev/null || true
   find "$r/bin" "$r/sbin" -type f -exec strip --strip-unneeded {} + 2>/dev/null || true
   find "$1" -mindepth 1 -depth -type d -empty -delete 2>/dev/null || true
+}
+
+cargo_desc() {      # Cargo.toml yolu -> tek satır açıklama
+  local f=$1 d=""
+  [ -f "$f" ] || return 0
+  d=$(sed -n 's/^description *= *"\(.*\)" *$/\1/p' "$f" | head -n1 | tr -d '\\')
+  case "$d" in '"'*) d="" ;; esac
+  if [ -z "$d" ]; then
+    d=$(awk '/^description *= *"""/{f=1; next} f && /"""/ {exit} f {printf "%s ", $0}' "$f" | sed 's/[[:space:]]*$//; s/\\//g')
+  fi
+  printf '%s' "$d"
 }
 
 default_build()   { ./configure --prefix="$PREFIX" $configure_flags && make -j"$JOBS"; }
@@ -134,7 +149,7 @@ run_recipe() {      # $1 = tarif dosyası, $2 = beklenen ad
   )
 }
 
-run_cargo() {       # ad crate
+run_cargo() {       # ad crate  (yerel cargo install, statik)
   (
     set -euo pipefail
     exec > "$OUT/_logs/$1.log" 2>&1
@@ -143,8 +158,16 @@ run_cargo() {       # ad crate
     HOST=${FORGE_RUST_TARGET:-$(rustc -vV | sed -n 's/^host: //p')}
     export CARGO_HOME="$WORK/cargo-home" RUSTFLAGS="-C target-feature=+crt-static" CARGO_NET_RETRY=10 CARGO_HTTP_TIMEOUT=60
     export CARGO_PROFILE_RELEASE_STRIP=symbols CARGO_PROFILE_RELEASE_DEBUG=0
-    timeout 2700 cargo install --locked --target "$HOST" --target-dir "$WORK/cargo-target/$1" \
-      --root "$T/root$PREFIX" -j "$JOBS" "$2"
+    if ! timeout 2700 cargo install --locked --target "$HOST" --target-dir "$WORK/cargo-target/$1" \
+         --root "$T/root$PREFIX" -j "$JOBS" "$2"; then
+      if grep -qiE 'Cargo\.lock|--locked' "$OUT/_logs/$1.log"; then
+        echo "--- --locked olmadan yeniden deneniyor"
+        timeout 2700 cargo install --target "$HOST" --target-dir "$WORK/cargo-target/$1" \
+          --root "$T/root$PREFIX" -j "$JOBS" "$2"
+      else
+        exit 1
+      fi
+    fi
     rm -rf "$WORK/cargo-target/$1"
     ver=$(sed -n 's/^"[^ ]* \([^ ]*\) (.*$/\1/p' "$T/root$PREFIX/.crates.toml" | head -n1)
     rm -f "$T/root$PREFIX/.crates.toml" "$T/root$PREFIX/.crates2.json"
@@ -153,15 +176,41 @@ run_cargo() {       # ad crate
     nonempty "$T/root" || { echo "paket boş"; exit 1; }
     src=$(ls -d "$CARGO_HOME"/registry/src/*/"$2-$ver"* 2>/dev/null | head -n1 || true)
     d=""
-    if [ -n "$src" ] && [ -f "$src/Cargo.toml" ]; then
-      d=$(sed -n 's/^description *= *"\(.*\)" *$/\1/p' "$src/Cargo.toml" | head -n1 | tr -d '\\')
-    fi
-    case "$d" in '"'*) d="" ;; esac
-    if [ -z "$d" ] && [ -n "$src" ] && [ -f "$src/Cargo.toml" ]; then
-      d=$(awk '/^description *= *"""/{f=1; next} f && /"""/ {exit} f {printf "%s ", $0}' "$src/Cargo.toml" | sed 's/^[[:space:]]*//; s/[[:space:]\\]*$//' | tr -d '\\"')
-    fi
+    if [ -n "$src" ]; then d=$(cargo_desc "$src/Cargo.toml"); fi
     [ -n "$d" ] || d="$2 (Rust)"
     write_control "$1" "$ver" "" "$d" "crates.io:$2" ""
+  )
+}
+
+run_cargo_cross() { # ad crate  ('cross' ile crates.io kaynağından çapraz derleme)
+  (
+    set -euo pipefail
+    exec > "$OUT/_logs/$1.log" 2>&1
+    TGT=${FORGE_RUST_TARGET:?FORGE_RUST_TARGET gerekli}
+    T="$OUT/$1"; rm -rf "$T"; mkdir -p "$T/root$PREFIX/bin" "$T/JPS"
+    ver=$(curl -fsSL --retry 3 -H "User-Agent: $UA" "https://crates.io/api/v1/crates/$2" | jq -r '.crate.max_stable_version // .crate.max_version')
+    { [ -n "$ver" ] && [ "$ver" != null ]; } || { echo "crates.io'da sürüm bulunamadı"; exit 1; }
+    d="$WORK/cx/$1"; rm -rf "$d"; mkdir -p "$d"
+    curl -fsSL --retry 3 -H "User-Agent: $UA" "https://static.crates.io/crates/$2/$2-$ver.crate" | tar -xz -C "$d" --strip-components=1
+    cd "$d"
+    lock=""; if [ -f Cargo.lock ]; then lock="--locked"; fi
+    if ! timeout 2700 cross build --release $lock --target "$TGT" --config 'profile.release.strip="symbols"'; then
+      if [ -n "$lock" ]; then
+        echo "--- --locked olmadan yeniden deneniyor"
+        timeout 2700 cross build --release --target "$TGT" --config 'profile.release.strip="symbols"'
+      else
+        exit 1
+      fi
+    fi
+    find "target/$TGT/release" -maxdepth 1 -type f -perm -u+x ! -name '*.so' ! -name '*.d' ! -name '*.rlib' | while IFS= read -r f; do
+      install -Dm755 "$f" "$T/root$PREFIX/bin/$(basename "$f")"
+    done
+    nonempty "$T/root" || { echo "ikili üretilmedi"; exit 1; }
+    ver=${ver%%+*}
+    dsc=$(cargo_desc "Cargo.toml")
+    [ -n "$dsc" ] || dsc="$2 (Rust)"
+    write_control "$1" "$ver" "" "$dsc" "crates.io:$2" ""
+    cd /; rm -rf "$d"
   )
 }
 
@@ -179,17 +228,69 @@ run_go() {          # ad modül
     unset PKG_CONFIG PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR CPPFLAGS LDFLAGS
     T="$OUT/$1"; rm -rf "$T"; mkdir -p "$T/root$PREFIX/bin" "$T/JPS"
     export GOPATH="$WORK/gopath" GOCACHE="$WORK/gocache" GOBIN="$T/root$PREFIX/bin" CGO_ENABLED=0 GOTOOLCHAIN=auto GOPROXY=https://proxy.golang.org,direct
-    timeout 2400 go install -trimpath -ldflags='-s -w' "$2@latest"
-    bin=$(ls "$GOBIN" | head -n1)
+    if [ -n "${FORGE_GOARCH:-}" ]; then export GOOS=linux GOARCH="$FORGE_GOARCH"; fi
+    ok=""
+    for try in 1 2 3; do
+      if timeout 2400 go install -trimpath -ldflags='-s -w' "$2@latest"; then ok=1; break; fi
+      tail -n 20 "$OUT/_logs/$1.log" | grep -qiE 'dial tcp|i/o timeout|lookup |connection|TLS|unexpected EOF' || break
+      echo "--- ağ hatası, yeniden deneniyor ($try)"; sleep $((try * 5))
+    done
+    [ -n "$ok" ] || exit 1
+    if [ -n "${FORGE_GOARCH:-}" ] && [ -d "$GOBIN/linux_$FORGE_GOARCH" ]; then
+      mv "$GOBIN/linux_$FORGE_GOARCH"/* "$GOBIN/"; rmdir "$GOBIN/linux_$FORGE_GOARCH"
+    fi
+    bin=$(find "$GOBIN" -maxdepth 1 -type f | head -n1)
     [ -n "$bin" ] || { echo "ikili üretilmedi"; exit 1; }
-    ver=$(go version -m "$GOBIN/$bin" | awk '$1=="mod"{print $3; exit}')
+    ver=$(go version -m "$bin" | awk '$1=="mod"{print $3; exit}')
     ver=${ver#v}; ver=${ver%%+*}
     case "$ver" in [0-9]*) ;; *) echo "geçersiz sürüm: $ver"; exit 1 ;; esac
     write_control "$1" "$ver" "" "Go aracı: $2" "go:$2" ""
   )
 }
 
-gnu_recipe() {      # ad bayraklar açıklama -> $WORK/gnu/<ad>.sh (en son sürümü ftp.gnu.org'dan seçer)
+run_font() {        # zip-adı etiket
+  local pkg; pkg=$(font_pkg "$1")
+  (
+    set -euo pipefail
+    exec > "$OUT/_logs/$pkg.log" 2>&1
+    ver=${2#v}
+    url="https://github.com/ryanoasis/nerd-fonts/releases/download/$2/$1.zip"
+    f="$DL/nf-$ver-$1.zip"
+    if [ ! -s "$f" ]; then curl -fsSL --retry 3 --connect-timeout 20 -o "$f.part" "$url"; mv "$f.part" "$f"; fi
+    got=$(sha256sum "$f" | cut -d' ' -f1)
+    d="$WORK/nf/$pkg"; rm -rf "$d"; mkdir -p "$d"
+    unzip -q -o "$f" -d "$d"
+    T="$OUT/$pkg"; rm -rf "$T"
+    mkdir -p "$T/JPS" "$T/root$PREFIX/share/fonts/nerd-fonts/$1" "$T/root$PREFIX/share/licenses/$pkg"
+    find "$d" -type f \( -iname '*.ttf' -o -iname '*.otf' \) -exec cp {} "$T/root$PREFIX/share/fonts/nerd-fonts/$1/" \;
+    find "$d" -maxdepth 1 -type f \( -iname 'LICENSE*' -o -iname 'OFL*' -o -iname 'README*' \) -exec cp {} "$T/root$PREFIX/share/licenses/$pkg/" \;
+    [ -n "$(find "$T/root$PREFIX/share/fonts/nerd-fonts/$1" -type f | head -n1)" ] || { echo "yazı tipi dosyası yok"; exit 1; }
+    printf '#!/bin/sh\n[ "$JPS_ROOT" = "/" ] || exit 0\ncommand -v fc-cache >/dev/null 2>&1 && fc-cache -f %s/share/fonts >/dev/null 2>&1 || true\n' "$PREFIX" > "$T/JPS/postinst"
+    cp "$T/JPS/postinst" "$T/JPS/postrm"; chmod 755 "$T/JPS/postinst" "$T/JPS/postrm"
+    write_control "$pkg" "$ver" "" "Nerd Fonts: $1 (programlama yazı tipi, simge yamalı)" "$url" "$got"
+    rm -rf "$d"
+  )
+}
+
+run_snap() {        # ad depo hedef açıklama
+  (
+    set -euo pipefail
+    exec > "$OUT/_logs/$1.log" 2>&1
+    url="https://github.com/$2/archive/HEAD.tar.gz"
+    f="$DL/snap-$1.tar.gz"
+    curl -fsSL --retry 3 --connect-timeout 20 -o "$f" "$url"
+    got=$(sha256sum "$f" | cut -d' ' -f1)
+    T="$OUT/$1"; rm -rf "$T"
+    dest="$T/root$PREFIX/$3/$(basename "$2")"
+    mkdir -p "$T/JPS" "$dest"
+    tar -xzf "$f" -C "$dest" --strip-components=1
+    rm -rf "$dest/.git" "$dest/.github"
+    nonempty "$T/root" || { echo "paket boş"; exit 1; }
+    write_control "$1" "0.0.$(date -u +%Y%m%d)" "" "$4" "$url" "$got"
+  )
+}
+
+gnu_recipe() {      # ad bayraklar açıklama -> $WORK/gnu/<ad>.sh
   local base="https://ftp.gnu.org/gnu/$1" file ver
   file=$(curl -fsSL --retry 3 --connect-timeout 20 "$base/" 2>/dev/null \
     | grep -o "href=\"$1-[0-9][0-9.]*\.tar\.\(xz\|gz\|bz2\)\"" | sed 's/^href="//; s/"$//' | sort -V | tail -n1)
@@ -200,6 +301,14 @@ gnu_recipe() {      # ad bayraklar açıklama -> $WORK/gnu/<ad>.sh (en son sür�
     echo "name=$1"; echo "version=$ver"; printf 'desc=%q\n' "$3"
     echo "src_url=$base/$file"; echo "pin=no"; printf 'configure_flags=%q\n' "$2"
   } > "$WORK/gnu/$1.sh"
+}
+
+finish() {          # ad rc  -> sonucu kaydet
+  if [ "$2" -eq 0 ]; then
+    say_ok "$1" "$(sed -n 's/^Version: //p' "$OUT/$1/JPS/control")"
+  else
+    say_skip "$1" "derleme başarısız: $(errtail "$1")"; show_fail "$1"; rm -rf "$OUT/$1"
+  fi
 }
 
 # ───────────── 1) el yazısı C tarifleri (yalnızca 0. parça) ─────────────
@@ -213,68 +322,107 @@ if has_phase c && { [ -n "${FORGE_ONLY:-}" ] || [ "$SHARDS" -le 1 ] || [ "$SHARD
     if out_of_time; then say_skip "$rn" "zaman bütçesi doldu"; continue; fi
     echo "→ $rn"
     run_recipe "$rf" "$rn" </dev/null; rc=$?
-    if [ $rc -eq 0 ]; then
-      if [ -f "$OUT/$rn/JPS/control" ]; then say_ok "$rn" "$(sed -n 's/^Version: //p' "$OUT/$rn/JPS/control")"
-      else echo "  ✔ $rn (kütüphane, paketlenmez)"; fi
-    else
-      say_skip "$rn" "derleme başarısız: $(errtail "$rn")"; show_fail "$rn"; rm -rf "$OUT/$rn"
-    fi
+    if [ $rc -eq 0 ] && [ ! -f "$OUT/$rn/JPS/control" ]; then echo "  ✔ $rn (kütüphane, paketlenmez)"; else finish "$rn" $rc; fi
   done < "$ROOT/recipes/order.list"
 fi
 
 # ───────────── 2) GNU araçları ─────────────
-echo "== Forge ($ARCH, parça $SHARD/$SHARDS): GNU =="
-i=0
-while IFS='|' read -r name flags desc; do
-  has_phase gnu || break
-  case "$name" in ''|'#'*) continue ;; esac
-  i=$((i+1))
-  want "$name" || continue
-  mine "$((i+7))" || continue
-  valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı"; continue; }
-  if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
-  echo "→ $name (GNU)"
-  if ! gnu_recipe "$name" "$flags" "$desc"; then say_skip "$name" "ftp.gnu.org'da sürüm bulunamadı"; continue; fi
-  run_recipe "$WORK/gnu/$name.sh" "$name" </dev/null; rc=$?
-  if [ $rc -eq 0 ]; then say_ok "$name" "$(sed -n 's/^Version: //p' "$OUT/$name/JPS/control")"
-  else say_skip "$name" "derleme başarısız: $(errtail "$name")"; show_fail "$name"; rm -rf "$OUT/$name"; fi
-done < <(grep -v '^[[:space:]]*#' "$ROOT/recipes/catalog/gnu.list")
+if has_phase gnu; then
+  echo "== Forge ($ARCH, parça $SHARD/$SHARDS): GNU =="
+  i=0
+  while IFS='|' read -r name flags desc; do
+    case "$name" in ''|'#'*) continue ;; esac
+    i=$((i+1))
+    want "$name" || continue
+    mine "$((i+7))" || continue
+    valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı"; continue; }
+    if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
+    echo "→ $name (GNU)"
+    if ! gnu_recipe "$name" "$flags" "$desc"; then say_skip "$name" "ftp.gnu.org'da sürüm bulunamadı"; continue; fi
+    run_recipe "$WORK/gnu/$name.sh" "$name" </dev/null; rc=$?
+    finish "$name" $rc
+  done < <(grep -v '^[[:space:]]*#' "$ROOT/recipes/catalog/gnu.list")
+fi
 
-# ───────────── 3) Rust (cargo) ─────────────
-echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Rust =="
-i=0
-while IFS= read -r tok; do
-  i=$((i+1))
-  has_phase rust || break
-  if [[ "$tok" == *=* ]]; then name=${tok%%=*}; crate=${tok#*=}; else crate=$tok; name=$(printf '%s' "$tok" | tr 'A-Z_' 'a-z-'); fi
-  want "$name" || continue
-  mine "$i" || continue
-  valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı"; continue; }
-  command -v cargo >/dev/null 2>&1 || { say_skip "$name" "cargo yok (bu mimaride Rust kurulamadı)"; continue; }
-  if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
-  echo "→ $name ($crate)"
-  run_cargo "$name" "$crate" </dev/null; rc=$?
-  if [ $rc -eq 0 ]; then say_ok "$name" "$(sed -n 's/^Version: //p' "$OUT/$name/JPS/control")"
-  else say_skip "$name" "derleme başarısız: $(errtail "$name")"; show_fail "$name"; rm -rf "$OUT/$name"; fi
-done < <(tokens "$ROOT/recipes/catalog/cargo.list")
+# ───────────── 3) Rust ─────────────
+if has_phase rust; then
+  echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Rust (${FORGE_RUST_MODE:-yerel}) =="
+  i=0
+  while IFS= read -r tok; do
+    i=$((i+1))
+    if [[ "$tok" == *=* ]]; then name=${tok%%=*}; crate=${tok#*=}; else crate=$tok; name=$(printf '%s' "$tok" | tr 'A-Z_' 'a-z-'); fi
+    want "$name" || continue
+    mine "$i" || continue
+    valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı"; continue; }
+    if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
+    if [ "${FORGE_RUST_MODE:-native}" = cross ]; then
+      command -v cross >/dev/null 2>&1 || { say_skip "$name" "cross yok"; continue; }
+      echo "→ $name ($crate, çapraz)"
+      run_cargo_cross "$name" "$crate" </dev/null; rc=$?
+    else
+      command -v cargo >/dev/null 2>&1 || { say_skip "$name" "cargo yok"; continue; }
+      echo "→ $name ($crate)"
+      run_cargo "$name" "$crate" </dev/null; rc=$?
+    fi
+    finish "$name" $rc
+  done < <(tokens "$ROOT/recipes/catalog/cargo.list")
+fi
 
 # ───────────── 4) Go ─────────────
-echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Go =="
-i=0
-while IFS= read -r tok; do
-  i=$((i+1))
-  has_phase go || break
-  if [[ "$tok" == *=* ]]; then name=${tok%%=*}; mod=${tok#*=}; else mod=$tok; name=$(go_name "$tok"); fi
-  want "$name" || continue
-  mine "$i" || continue
-  valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı ($mod)"; continue; }
-  command -v go >/dev/null 2>&1 || { say_skip "$name" "go yok (bu mimaride Go kurulamadı)"; continue; }
-  if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
-  echo "→ $name ($mod)"
-  run_go "$name" "$mod" </dev/null; rc=$?
-  if [ $rc -eq 0 ]; then say_ok "$name" "$(sed -n 's/^Version: //p' "$OUT/$name/JPS/control")"
-  else say_skip "$name" "derleme başarısız: $(errtail "$name")"; show_fail "$name"; rm -rf "$OUT/$name"; fi
-done < <(tokens "$ROOT/recipes/catalog/go.list")
+if has_phase go; then
+  echo "== Forge ($ARCH, parça $SHARD/$SHARDS): Go${FORGE_GOARCH:+ (GOARCH=$FORGE_GOARCH)} =="
+  i=0
+  while IFS= read -r tok; do
+    i=$((i+1))
+    if [[ "$tok" == *=* ]]; then name=${tok%%=*}; mod=${tok#*=}; else mod=$tok; name=$(go_name "$tok"); fi
+    want "$name" || continue
+    mine "$i" || continue
+    valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı ($mod)"; continue; }
+    command -v go >/dev/null 2>&1 || { say_skip "$name" "go yok"; continue; }
+    if out_of_time; then say_skip "$name" "zaman bütçesi doldu"; continue; fi
+    echo "→ $name ($mod)"
+    run_go "$name" "$mod" </dev/null; rc=$?
+    finish "$name" $rc
+  done < <(tokens "$ROOT/recipes/catalog/go.list")
+fi
+
+# ───────────── 5) Yazı tipleri (mimariden bağımsız) ─────────────
+if has_phase fonts; then
+  echo "== Forge ($ARCH): Nerd Fonts =="
+  NF_TAG=$(curl -fsSI -A "$UA" https://github.com/ryanoasis/nerd-fonts/releases/latest | tr -d '\r' | sed -n 's#^[Ll]ocation: .*/tag/##p' | head -n1 || true)
+  if [ -z "$NF_TAG" ]; then
+    say_skip "nerd-fonts" "sürüm etiketi bulunamadı"
+  else
+    echo "  etiket: $NF_TAG"
+    i=0
+    while IFS= read -r z; do
+      i=$((i+1)); pkg=$(font_pkg "$z")
+      want "$pkg" || continue
+      mine "$i" || continue
+      valid_pkg "$pkg" || { say_skip "$pkg" "geçersiz paket adı"; continue; }
+      if out_of_time; then say_skip "$pkg" "zaman bütçesi doldu"; continue; fi
+      echo "→ $pkg"
+      run_font "$z" "$NF_TAG" </dev/null; rc=$?
+      finish "$pkg" $rc
+    done < <(tokens "$ROOT/recipes/catalog/fonts.list")
+  fi
+fi
+
+# ───────────── 6) Eklenti anlık görüntüleri (mimariden bağımsız) ─────────────
+if has_phase snap; then
+  echo "== Forge ($ARCH): eklentiler =="
+  i=0
+  while IFS='|' read -r name repo dest desc; do
+    case "$name" in ''|'#'*) continue ;; esac
+    i=$((i+1))
+    want "$name" || continue
+    mine "$i" || continue
+    valid_pkg "$name" || { say_skip "$name" "geçersiz paket adı"; continue; }
+    echo "→ $name ($repo)"
+    run_snap "$name" "$repo" "$dest" "$desc" </dev/null; rc=$?
+    finish "$name" $rc
+  done < <(grep -v '^[[:space:]]*#' "$ROOT/recipes/catalog/snap.list")
+fi
 
 # bağımlılığı derlenememiş paketleri ele (yayınlanan depo tutarlı kalsın)
 changed=1
