@@ -106,7 +106,7 @@ jobs:
             -e FORGE_SHARDS=8 -e FORGE_SHARD=${{ matrix.shard }} -e FORGE_BUDGET_MIN=$BUD \
             -e HOST_UID="$(id -u)" \
             alpine:3.21 sh scripts/forge/ci-entry.sh /src/trees/${{ matrix.arch }}-s${{ matrix.shard }}
-      - name: Rust (i386: Debian i386 konteyneri, i686-musl hedefi)
+      - name: "Rust (i386: Debian i386 konteyneri, i686-musl hedefi)"
         if: matrix.arch == 'i386'
         continue-on-error: true
         run: |
