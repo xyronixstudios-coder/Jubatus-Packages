@@ -22,3 +22,91 @@ vim-airline|vim-airline/vim-airline|share/vim/plugins|Vim durum çubuğu
 vim-surround|tpope/vim-surround|share/vim/plugins|Vim'de çevreleyen karakterleri düzenleme
 vim-fugitive|tpope/vim-fugitive|share/vim/plugins|Vim için Git sarmalayıcı
 vim-commentary|tpope/vim-commentary|share/vim/plugins|Vim'de yorum satırı aç/kapa
+vim-sensible|tpope/vim-sensible|share/vim/plugins|Vim için mantıklı varsayılanlar
+vim-repeat|tpope/vim-repeat|share/vim/plugins|Eklenti eylemlerini nokta (.) ile tekrarlar
+vim-unimpaired|tpope/vim-unimpaired|share/vim/plugins|Vim köşeli parantez kısayolları
+vim-eunuch|tpope/vim-eunuch|share/vim/plugins|Vim'den Unix komutları (Rename, Delete, SudoWrite)
+vim-vinegar|tpope/vim-vinegar|share/vim/plugins|netrw dosya gezgini iyileştirmeleri
+vim-abolish|tpope/vim-abolish|share/vim/plugins|Vim'de akıllı değiştirme ve büyük/küçük harf dönüşümü
+vim-easy-align|junegunn/vim-easy-align|share/vim/plugins|Vim hizalama eklentisi
+goyo-vim|junegunn/goyo.vim|share/vim/plugins|Vim dikkat dağıtmayan yazma modu
+limelight-vim|junegunn/limelight.vim|share/vim/plugins|Vim'de geçerli paragrafı vurgular
+vim-gitgutter|airblade/vim-gitgutter|share/vim/plugins|Vim'de git değişiklik işaretleri
+ale|dense-analysis/ale|share/vim/plugins|Vim için eşzamansız lint ve düzeltme
+vim-polyglot|sheerun/vim-polyglot|share/vim/plugins|Vim için dil paketleri koleksiyonu
+ctrlp-vim|ctrlpvim/ctrlp.vim|share/vim/plugins|Vim bulanık dosya arama
+undotree|mbbill/undotree|share/vim/plugins|Vim geri alma ağacı
+tagbar|preservim/tagbar|share/vim/plugins|Vim kod yapısı kenar çubuğu
+nerdcommenter|preservim/nerdcommenter|share/vim/plugins|Vim yorum satırı eklentisi
+vim-gruvbox|morhetz/gruvbox|share/vim/plugins|Gruvbox renk şeması
+vim-dracula|dracula/vim|share/vim/plugins|Dracula renk şeması (Vim)
+vim-catppuccin|catppuccin/vim|share/vim/plugins|Catppuccin renk şeması (Vim)
+vim-airline-themes|vim-airline/vim-airline-themes|share/vim/plugins|Vim-airline temaları
+vim-lightline|itchyny/lightline.vim|share/vim/plugins|Hafif Vim durum çubuğu
+vim-startify|mhinz/vim-startify|share/vim/plugins|Vim başlangıç ekranı
+vim-signify|mhinz/vim-signify|share/vim/plugins|Vim'de sürüm kontrol işaretleri
+vim-visual-multi|mg979/vim-visual-multi|share/vim/plugins|Vim çoklu imleç
+vim-which-key|liuchengxu/vim-which-key|share/vim/plugins|Vim kısayol ipuçları
+vim-go|fatih/vim-go|share/vim/plugins|Vim için Go geliştirme eklentisi
+rust-vim|rust-lang/rust.vim|share/vim/plugins|Vim için Rust desteği
+vim-markdown|preservim/vim-markdown|share/vim/plugins|Vim Markdown desteği
+vim-slime|jpalardy/vim-slime|share/vim/plugins|Vim'den REPL'e kod gönderir
+vim-test|vim-test/vim-test|share/vim/plugins|Vim'den testleri çalıştırır
+vim-better-whitespace|ntpeters/vim-better-whitespace|share/vim/plugins|Vim'de gereksiz boşlukları gösterir
+indentline|Yggdroot/indentLine|share/vim/plugins|Vim girinti çizgileri
+telescope-nvim|nvim-telescope/telescope.nvim|share/nvim/plugins|Neovim bulanık bulucu
+plenary-nvim|nvim-lua/plenary.nvim|share/nvim/plugins|Neovim Lua yardımcı kütüphanesi
+nvim-treesitter|nvim-treesitter/nvim-treesitter|share/nvim/plugins|Neovim tree-sitter bütünleşmesi
+nvim-lspconfig|neovim/nvim-lspconfig|share/nvim/plugins|Neovim LSP yapılandırmaları
+which-key-nvim|folke/which-key.nvim|share/nvim/plugins|Neovim kısayol ipuçları
+gitsigns-nvim|lewis6991/gitsigns.nvim|share/nvim/plugins|Neovim git işaretleri
+lualine-nvim|nvim-lualine/lualine.nvim|share/nvim/plugins|Neovim durum çubuğu
+nvim-tree-lua|nvim-tree/nvim-tree.lua|share/nvim/plugins|Neovim dosya ağacı
+tokyonight-nvim|folke/tokyonight.nvim|share/nvim/plugins|Tokyo Night teması (Neovim)
+catppuccin-nvim|catppuccin/nvim|share/nvim/plugins|Catppuccin teması (Neovim)
+nvim-cmp|hrsh7th/nvim-cmp|share/nvim/plugins|Neovim otomatik tamamlama
+nvim-autopairs|windwp/nvim-autopairs|share/nvim/plugins|Neovim parantez eşleme
+toggleterm-nvim|akinsho/toggleterm.nvim|share/nvim/plugins|Neovim terminal yönetimi
+trouble-nvim|folke/trouble.nvim|share/nvim/plugins|Neovim tanılama listesi
+oil-nvim|stevearc/oil.nvim|share/nvim/plugins|Neovim'de dizinleri tampon gibi düzenler
+conform-nvim|stevearc/conform.nvim|share/nvim/plugins|Neovim biçimlendirici
+neogit|NeogitOrg/neogit|share/nvim/plugins|Neovim için Magit benzeri git arayüzü
+diffview-nvim|sindrets/diffview.nvim|share/nvim/plugins|Neovim diff ve birleştirme görünümü
+lazy-nvim|folke/lazy.nvim|share/nvim/plugins|Neovim eklenti yöneticisi
+kickstart-nvim|nvim-lua/kickstart.nvim|share/nvim|Neovim başlangıç yapılandırması
+zsh-vi-mode|jeffreytse/zsh-vi-mode|share/zsh/plugins|Zsh için vi kipi
+zsh-defer|romkatv/zsh-defer|share/zsh/plugins|Zsh komutlarını ertelemeli çalıştırır
+forgit|wfxr/forgit|share/zsh/plugins|fzf ile etkileşimli git komutları
+zsh-autopair|hlissner/zsh-autopair|share/zsh/plugins|Zsh parantez ve tırnak eşleme
+zsh-bd|Tarrasch/zsh-bd|share/zsh/plugins|Zsh'de üst dizine hızlı dönüş
+pure-prompt|sindresorhus/pure|share/zsh/themes|Minimal Zsh istemi
+spaceship-prompt|spaceship-prompt/spaceship-prompt|share/zsh/themes|Zsh için Spaceship istemi
+ohmybash|ohmybash/oh-my-bash|share|Oh My Bash çerçevesi
+bash-it|Bash-it/bash-it|share|Bash-it çerçevesi
+bash-git-prompt|magicmonty/bash-git-prompt|share|Bash'te git bilgili istem
+liquidprompt|liquidprompt/liquidprompt|share|Uyarlanabilir Bash/Zsh istemi
+base16-shell|tinted-theming/base16-shell|share|Base16 terminal renk şemaları
+tmux-prefix-highlight|tmux-plugins/tmux-prefix-highlight|share/tmux/plugins|Tmux önek tuşu göstergesi
+tmux-open|tmux-plugins/tmux-open|share/tmux/plugins|Tmux'ta seçili dosya/adresi açar
+tmux-copycat|tmux-plugins/tmux-copycat|share/tmux/plugins|Tmux'ta düzenli ifadeyle arama
+tmux-pain-control|tmux-plugins/tmux-pain-control|share/tmux/plugins|Tmux bölme yönetim kısayolları
+tmux-sessionist|tmux-plugins/tmux-sessionist|share/tmux/plugins|Tmux oturum yönetimi
+tmux-fzf|sainnhe/tmux-fzf|share/tmux/plugins|Tmux'u fzf ile yönetir
+tmux-dracula|dracula/tmux|share/tmux/plugins|Dracula teması (Tmux)
+tmux-power|wfxr/tmux-power|share/tmux/plugins|Tmux durum çubuğu teması
+tmux-tokyo-night|janoamaral/tokyo-night-tmux|share/tmux/plugins|Tokyo Night teması (Tmux)
+nvm|nvm-sh/nvm|share|Node.js sürüm yöneticisi (kabuk betiği)
+pyenv|pyenv/pyenv|share|Python sürüm yöneticisi
+rbenv|rbenv/rbenv|share|Ruby sürüm yöneticisi
+ruby-build|rbenv/ruby-build|share|rbenv için Ruby derleyici eklentisi
+asdf|asdf-vm/asdf|share|Çok dilli sürüm yöneticisi
+tfenv|tfutils/tfenv|share|Terraform sürüm yöneticisi
+goenv|go-nv/goenv|share|Go sürüm yöneticisi
+nodenv|nodenv/nodenv|share|Node.js sürüm yöneticisi (nodenv)
+git-extras|tj/git-extras|share|Ek git komutları koleksiyonu
+diff-so-fancy|so-fancy/diff-so-fancy|share|Okunaklı git diff çıktısı
+bats-core|bats-core/bats-core|share|Bash otomatik test sistemi
+fzf-git|junegunn/fzf-git.sh|share|fzf ile git nesnelerini gezme
+pfetch|dylanaraps/pfetch|share|Basit sistem bilgisi betiği
+screenfetch|KittyKatt/screenFetch|share|Sistem bilgisi gösterici (Bash)
+cheatsheets|cheat/cheatsheets|share|cheat için komut ipucu koleksiyonu

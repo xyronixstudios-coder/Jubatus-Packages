@@ -47,7 +47,7 @@ out_of_time() { [ "$BUDGET" -gt 0 ] && [ $(( SECONDS - START )) -ge $(( BUDGET *
 has_phase()   { case " ${FORGE_PHASES:-c gnu rust go} " in *" $1 "*) return 0 ;; esac; return 1; }
 say_ok()      { echo "$1" >> "$OUT/top.list"; echo "  ✔ $1 ${2:-}"; }
 say_skip()    { echo "$1: $2" >> "$OUT/skipped.txt"; echo "  ✘ $1: $2"; }
-errtail()     { tail -n 4 "$OUT/_logs/$1.log" 2>/dev/null | tr '\n\t' '  ' | cut -c1-220; }
+errtail()     { { grep -m1 -iE 'error|cannot |requires |could not|panicked|failed' "$OUT/_logs/$1.log" 2>/dev/null || tail -n 2 "$OUT/_logs/$1.log" 2>/dev/null; } | tr '\n\t' '  ' | cut -c1-200; }
 show_fail()   { tail -n 8 "$OUT/_logs/$1.log" 2>/dev/null | cut -c1-200 | sed 's/^/      | /'; }
 valid_pkg()   { case "$1" in ''|*[!a-z0-9+.-]*|[!a-z0-9]*) return 1 ;; esac; [ "${#1}" -ge 2 ]; }
 nonempty()    { [ -n "$(find "$1" \( -type f -o -type l \) 2>/dev/null | head -n1)" ]; }
@@ -227,8 +227,16 @@ run_go() {          # ad modül
     exec > "$OUT/_logs/$1.log" 2>&1
     unset PKG_CONFIG PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR CPPFLAGS LDFLAGS
     T="$OUT/$1"; rm -rf "$T"; mkdir -p "$T/root$PREFIX/bin" "$T/JPS"
-    export GOPATH="$WORK/gopath" GOCACHE="$WORK/gocache" GOBIN="$T/root$PREFIX/bin" CGO_ENABLED=0 GOTOOLCHAIN=auto GOPROXY=https://proxy.golang.org,direct
-    if [ -n "${FORGE_GOARCH:-}" ]; then export GOOS=linux GOARCH="$FORGE_GOARCH"; fi
+    BINDIR="$T/root$PREFIX/bin"
+    export GOPATH="$WORK/gopath" GOCACHE="$WORK/gocache" CGO_ENABLED=0 GOTOOLCHAIN=auto GOPROXY=https://proxy.golang.org,direct
+    if [ -n "${FORGE_GOARCH:-}" ]; then
+      # çapraz derlemede GOBIN tanımlı olamaz: ikili $GOPATH/bin/linux_<arch>/ altına düşer
+      unset GOBIN
+      export GOOS=linux GOARCH="$FORGE_GOARCH"
+      rm -rf "$GOPATH/bin/linux_$FORGE_GOARCH"
+    else
+      export GOBIN="$BINDIR"
+    fi
     ok=""
     for try in 1 2 3; do
       if timeout 2400 go install -trimpath -ldflags='-s -w' "$2@latest"; then ok=1; break; fi
@@ -236,10 +244,13 @@ run_go() {          # ad modül
       echo "--- ağ hatası, yeniden deneniyor ($try)"; sleep $((try * 5))
     done
     [ -n "$ok" ] || exit 1
-    if [ -n "${FORGE_GOARCH:-}" ] && [ -d "$GOBIN/linux_$FORGE_GOARCH" ]; then
-      mv "$GOBIN/linux_$FORGE_GOARCH"/* "$GOBIN/"; rmdir "$GOBIN/linux_$FORGE_GOARCH"
+    if [ -n "${FORGE_GOARCH:-}" ]; then
+      src="$GOPATH/bin/linux_$FORGE_GOARCH"
+      [ -d "$src" ] || { echo "çapraz derlenmiş ikili dizini yok: $src"; exit 1; }
+      cp "$src"/* "$BINDIR/"
+      rm -rf "$src"
     fi
-    bin=$(find "$GOBIN" -maxdepth 1 -type f | head -n1)
+    bin=$(find "$BINDIR" -maxdepth 1 -type f | head -n1)
     [ -n "$bin" ] || { echo "ikili üretilmedi"; exit 1; }
     ver=$(go version -m "$bin" | awk '$1=="mod"{print $3; exit}')
     ver=${ver#v}; ver=${ver%%+*}
@@ -281,7 +292,7 @@ run_snap() {        # ad depo hedef açıklama
     curl -fsSL --retry 3 --connect-timeout 20 -o "$f" "$url"
     got=$(sha256sum "$f" | cut -d' ' -f1)
     T="$OUT/$1"; rm -rf "$T"
-    dest="$T/root$PREFIX/$3/$(basename "$2")"
+    dest="$T/root$PREFIX/$3/$1"
     mkdir -p "$T/JPS" "$dest"
     tar -xzf "$f" -C "$dest" --strip-components=1
     rm -rf "$dest/.git" "$dest/.github"
