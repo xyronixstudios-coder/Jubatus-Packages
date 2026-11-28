@@ -1,0 +1,22 @@
+mdcat: derleme başarısız:   Downloaded thiserror v1.0.69 
+jless: derleme başarısız:    Compiling proc-macro-error-attr v1.0.4 
+websocat: derleme başarısız: warning: openssl-sys@0.9.117: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had trouble finding 
+joshuto: derleme başarısız:    Compiling thiserror v1.0.69 
+hck: derleme başarısız: error: failed to run custom build command for `libz-ng-sys v1.1.28` 
+hurl: derleme başarısız: warning: openssl-sys@0.9.117: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had trouble finding 
+wiki-tui: derleme başarısız: warning: openssl-sys@0.9.111: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had trouble finding 
+huniq: derleme başarısız: error: linking with `cc` failed: exit status: 1 
+zola: derleme başarısız: error: cannot install package `zola`, it has been yanked from registry `crates-io` 
+sheldon: derleme başarısız:   Downloaded thiserror-impl v2.0.12 
+rathole: derleme başarısız:   Downloaded thiserror v1.0.49 
+atuin: derleme başarısız:   Downloaded proc-macro-error-attr3 v3.1.1 
+convco: derleme başarısız:   Downloaded thiserror-impl v2.0.20 
+selene: derleme başarısız:   Downloaded proc-macro-error v1.0.4 
+ouch: derleme başarısız:    Compiling thiserror v2.0.18 
+gitoxide: derleme başarısız:   Downloaded gix-error v0.5.3 
+agg: derleme başarısız: error: there is nothing to install in `agg v0.1.0`, because it has no binaries 
+cargo-update: derleme başarısız: warning: openssl-sys@0.9.118: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had trouble finding 
+xcp: derleme başarısız:    Compiling thiserror v2.0.21 
+frpc: derleme başarısız: go: github.com/fatedier/frp@v0.72.0 requires go >= 1.26.0; switching to go1.26.11 
+sad: derleme başarısız: error: there is nothing to install in `sad v0.1.0`, because it has no binaries 
+frps: derleme başarısız: go: github.com/fatedier/frp@v0.72.0 requires go >= 1.26.0; switching to go1.26.11 

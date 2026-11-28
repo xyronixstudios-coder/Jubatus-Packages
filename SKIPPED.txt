@@ -1,0 +1,3 @@
+nerd-font-iosevkaterm (all): 294043239 bayt, GitHub dosya sınırını aşıyor
+nerd-font-mplus (all): 109416310 bayt, GitHub dosya sınırını aşıyor
+nerd-font-zedmono (all): 218929561 bayt, GitHub dosya sınırını aşıyor

@@ -1,0 +1,30 @@
+mdcat: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+jless: derleme başarısız: [1m[92m   Compiling[0m proc-macro-error-attr v1.0.4 
+websocat: derleme başarısız: [1m[33mwarning[0m: openssl-sys@0.9.117: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had tro
+samply: derleme başarısız: [1m[92m   Compiling[0m thiserror v1.0.69 
+popeye: derleme başarısız: go: downloading github.com/go-openapi/errors v0.22.0 
+hurl: derleme başarısız: [1m[33mwarning[0m: openssl-sys@0.9.117: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had tro
+wiki-tui: derleme başarısız: [1m[33mwarning[0m: openssl-sys@0.9.111: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had tro
+binsider: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.18 
+mprocs: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.12 
+huniq: derleme başarısız: [1m[91merror[0m[1m: linking with `i686-linux-musl-gcc` failed: exit status: 1[0m 
+zola: derleme başarısız: curl: (22) The requested URL returned error: 404 
+sheldon: derleme başarısız: [1m[33mwarning[0m: openssl-sys@0.9.109: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had tro
+rathole: derleme başarısız: [1m[92m   Compiling[0m thiserror v1.0.49 
+kalker: derleme başarısız: [1m[91merror[0m: failed to run custom build command for `gmp-mpfr-sys v1.6.8` 
+atuin: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+difftastic: derleme başarısız: [1m[91merror[0m[1m: linking with `i686-linux-musl-gcc` failed: exit status: 1[0m 
+selene: derleme başarısız: [1m[92m   Compiling[0m proc-macro-error-attr v1.0.4 
+ouch: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.18 
+oha: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+gitoxide: derleme başarısız: [1m[92m   Compiling[0m gix-error v0.5.3 
+tabiew: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+agg: derleme başarısız: [1m[91merror[E0308][0m[1m: mismatched types[0m 
+tree-sitter-cli: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+cargo-update: derleme başarısız: [1m[33mwarning[0m: openssl-sys@0.9.118: Could not find directory of OpenSSL installation, and this `-sys` crate cannot proceed without this knowledge. If OpenSSL is installed and this crate had tro
+xcp: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+frpc: derleme başarısız: go: downloading github.com/klauspost/cpuid/v2 v2.2.6 ../../_temp/forge-work/gopath/pkg/mod/github.com/fatedier/frp@v0.72.0/web/frpc/embed.go:11:12: pattern dist: no matching files found 
+sad: derleme başarısız: [1m[92m    Finished[0m `release` profile [optimized] target(s) in 0.04s ikili üretilmedi 
+xplr: derleme başarısız: [1m[92m   Compiling[0m thiserror v2.0.21 
+angle-grinder: derleme başarısız: [1m[92m   Compiling[0m thiserror v1.0.69 
+frps: derleme başarısız: go: downloading github.com/klauspost/cpuid/v2 v2.2.6 ../../_temp/forge-work/gopath/pkg/mod/github.com/fatedier/frp@v0.72.0/web/frps/embed.go:11:12: pattern dist: no matching files found 
